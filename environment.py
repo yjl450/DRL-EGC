@@ -661,7 +661,7 @@ class ElevatorEnv(gym.Env):
             for i in range(self.elevator_num): 
                 print("Elevator", i, "Passengers:", self.state[self.elevator_num + i*self.elevator_limit: self.elevator_num + (i+1)*self.elevator_limit])
             for i in range(self.floor_num):    
-                print("Floor", i, "Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit + i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
+                print("Floor", i+1, "Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit + i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
         else:
             print("Elevator Passengers:", self.state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
             print("Floor Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit:])
@@ -672,7 +672,7 @@ if __name__ == "__main__":
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
-        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 2, 'floor_limit': 10, 
+        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 4, 'floor_limit': 20, 
         'step_size': 1000, 'possion_lamda': 50, 'seed': 1},
     )
     env = gym.make('Elevator-v0')
