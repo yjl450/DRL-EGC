@@ -161,6 +161,7 @@ class ElevatorEnv(gym.Env):
         for i in range(elevator_index_start, elevator_index_end):
             if state[i] == floor:
                 state[i] = 0
+                self.waiting_passengers -= 1
                 count += 1
         return (count > 0), count
 
@@ -180,6 +181,7 @@ class ElevatorEnv(gym.Env):
     # Returns True if at least a passenger was loaded, how many where loaded, and how many where left at the floor
 
     def loadPassenger(self, state, which_elevator, floor):
+        # TODO: check the direction of passengers at this floor
         passengers_before_loading = self.passengerAtFloor(state, floor)[1]
         loaded_passengers = 0
         current_floor_index = self.floor_start_index + \
@@ -209,7 +211,7 @@ class ElevatorEnv(gym.Env):
             passenger_to_lower_floors, num_passenger_to_lower_floor = self.passengerToLowerFloor(
                 state, current_floor)
 
-            # shit action m8
+            # calculate rewards
             if not passenger_at_lower_floors and not passenger_to_lower_floors:
                 reward -= 100
 
@@ -237,7 +239,7 @@ class ElevatorEnv(gym.Env):
             passenger_to_upper_floors, num_passenger_to_upper_floor = self.passengerToUpperFloor(
                 state, current_floor)
 
-            # shit action m8
+            # calculate rewards
             if not passenger_at_upper_floors and not passenger_to_upper_floors:
                 reward -= 100
 
@@ -287,13 +289,15 @@ class ElevatorEnv(gym.Env):
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
         state = copy.copy(self.state)
-        current_floor = int(state[0])
+        
         reward = 0
 
         # Turns action to a list of actions for each elevator
         actions = self.decodeAction(action, 3)
         #print(action, actions)
         for i in range(self.elevator_num):
+            # get the current floor for this elevator
+            current_floor = int(state[i])
             # Decode action for this elevator
             specific_action = actions[i]
             #print("Elevator",i,"goes for action", specific_action)
@@ -350,8 +354,8 @@ class ElevatorEnv(gym.Env):
 
         # initial elevator position
         for i in range(self.elevator_num):
-            # self.state[i] = self.np_random.randint(1, self.floor_num+1)
-            self.state[i] = 0
+            self.state[i] = self.np_random.randint(1, self.floor_num+1)
+            # self.state[i] = 0
 
         # here index is 51
         self.waiting_passengers = self.capacity
@@ -370,6 +374,7 @@ class ElevatorEnv(gym.Env):
 
             stockwerk_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
                                                                                                  self.floor_limit))
+      
             for k in range(0,  self.floor_limit):
                 if self.state[stockwerk_index+k] == 0:
                     self.state[stockwerk_index+k] = random_destination
