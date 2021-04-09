@@ -55,13 +55,13 @@ class ElevatorEnv(gym.Env):
         self.floor_num = floor_num
         self.floor_limit = floor_limit
         self.capacity = capacity
-        self.waiting_passangers = capacity
+        self.waiting_passengers = capacity
 
         self.valid_actions = [0, 1, 2]
 
-        # Index where passenger slots starts
+        # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
-        # Index where first slot of first floor starts
+        # Index where first slot of first floor starts in the state array
         self.floor_start_index = (
             self.elevator_num + (self.elevator_limit*self.elevator_num))
 
@@ -88,7 +88,7 @@ class ElevatorEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    # returns true if any passanger is destinated to a upper floor and how many
+    # returns true if any passenger is destinated to a upper floor and how many
     def passengerToUpperFloor(self, state, current_floor):
         count = 0
         # TODO code müsste für mehraufzüge angepasst werden
@@ -97,7 +97,7 @@ class ElevatorEnv(gym.Env):
                 count += 1
         return (count > 0), count
 
-    # returns true if any passanger is destinated to a lower floor and how many
+    # returns true if any passenger is destinated to a lower floor and how many
     def passengerToLowerFloor(self, state, current_floor):
         count = 0
         # TODO code müsste für mehraufzüge angepasst werden
@@ -106,8 +106,8 @@ class ElevatorEnv(gym.Env):
                 count += 1
         return (count > 0), count
 
-    # returns true if any passanger is waiting at a upper floor and how many
-    def passangerAtUpperFloor(self, state, current_floor):
+    # returns true if any passenger is waiting at a upper floor and how many
+    def passengerAtUpperFloor(self, state, current_floor):
         count = 0
         next_floor_index = self.floor_start_index + \
             ((current_floor-1)*self.floor_limit) + self.floor_limit
@@ -119,8 +119,8 @@ class ElevatorEnv(gym.Env):
                 count += 1
         return (count > 0), count
 
-     # returns true if any passanger is waiting at a upper floor and how many
-    def passangerAtLowerFloor(self, state, current_floor):
+     # returns true if any passenger is waiting at a upper floor and how many
+    def passengerAtLowerFloor(self, state, current_floor):
         count = 0
         previous_floor_last_index = self.floor_start_index + \
             ((current_floor-1)*self.floor_limit)
@@ -130,7 +130,7 @@ class ElevatorEnv(gym.Env):
                 count += 1
         return (count > 0), count
 
-    def passangerAtFloor(self, state, floor):
+    def passengerAtFloor(self, state, floor):
         count = 0
         current_floor_index = self.floor_start_index + \
             ((floor - 1)*self.floor_limit)
@@ -177,10 +177,10 @@ class ElevatorEnv(gym.Env):
         return index
 
     # Load passengers from given floor
-    # Returns True if at least a passenger was laoded, how many where loaded, and how many where left at the floor
+    # Returns True if at least a passenger was loaded, how many where loaded, and how many where left at the floor
 
     def loadPassenger(self, state, which_elevator, floor):
-        passengers_before_loading = self.passangerAtFloor(state, floor)[1]
+        passengers_before_loading = self.passengerAtFloor(state, floor)[1]
         loaded_passengers = 0
         current_floor_index = self.floor_start_index + \
             ((floor - 1)*self.floor_limit)
@@ -202,10 +202,10 @@ class ElevatorEnv(gym.Env):
         else:
             # check if there is reason to go a floor up
             # is there a passenger waiting at a lower a floor?
-            passenger_at_lower_floors, num_passenger_at_lower_floor = self.passangerAtLowerFloor(
+            passenger_at_lower_floors, num_passenger_at_lower_floor = self.passengerAtLowerFloor(
                 state, current_floor)
 
-            # is a passanger inside the elevator destinated to an upper floor?
+            # is a passenger inside the elevator destinated to an upper floor?
             passenger_to_lower_floors, num_passenger_to_lower_floor = self.passengerToLowerFloor(
                 state, current_floor)
 
@@ -230,10 +230,10 @@ class ElevatorEnv(gym.Env):
             # check if there is reason to go a floor up
 
             # is there a passenger waiting at a higher a floor?
-            passenger_at_upper_floors, num_passenger_at_upper_floor = self.passangerAtUpperFloor(
+            passenger_at_upper_floors, num_passenger_at_upper_floor = self.passengerAtUpperFloor(
                 state, current_floor)
 
-            # is a passanger inside the elevator destinated to an upper floor?
+            # is a passenger inside the elevator destinated to an upper floor?
             passenger_to_upper_floors, num_passenger_to_upper_floor = self.passengerToUpperFloor(
                 state, current_floor)
 
@@ -265,8 +265,8 @@ class ElevatorEnv(gym.Env):
         passengers_entered = False
         num_passengers_entered = 0
         num_passenger_left_at_floor = 0
-        if self.passangerAtFloor(state, current_floor)[0]:
-            #print("Passengers at floor", self.passangerAtFloor(state,current_floor)[1])
+        if self.passengerAtFloor(state, current_floor)[0]:
+            #print("Passengers at floor", self.passengerAtFloor(state,current_floor)[1])
             passengers_entered, num_passengers_entered, num_passenger_left_at_floor = self.loadPassenger(
                 state, which_elevator, current_floor)
             #print("Passengers entered Elevator", passengers_entered, num_passengers_entered)
@@ -316,7 +316,7 @@ class ElevatorEnv(gym.Env):
                 #print("Elevator",i,"at floor",state[i], "went stopped")
             #print("Elevator",i,"at floor",state[i])
         done = False
-        if self.waiting_passangers == 0:
+        if self.waiting_passengers == 0:
             done = True
             reward += 400
         return state, reward, done, {}
@@ -344,7 +344,7 @@ class ElevatorEnv(gym.Env):
         return np.array(state), reward, done, obj
 
     def reset(self):
-        # set here waiting_passangers
+        # set here waiting_passengers
         self.state = np.zeros(self.elevator_num + (self.elevator_num *
                               self.elevator_limit) + (self.floor_num * self.floor_limit))
 
@@ -354,8 +354,8 @@ class ElevatorEnv(gym.Env):
             self.state[i] = 0
 
         # here index is 51
-        self.waiting_passangers = self.capacity
-        for i in range(self.waiting_passangers):
+        self.waiting_passengers = self.capacity
+        for i in range(self.waiting_passengers):
 
             # self.state[1 + self.elevator_limit +
             #         (self.floor_num - 1) * self.floor_limit] = 1
@@ -489,16 +489,16 @@ class ElevatorEnv(gym.Env):
 
             # start = floor * self.floor_limit + self.elevator_limit + 1
             # stop = start + self.floor_limit
-            # waiting_passangers_floor = 0
+            # waiting_passengers_floor = 0
             # for i in range(int(start), int(stop)):
             #     if self.state[i] > 0:
-            #         waiting_passangers_floor += 1
+            #         waiting_passengers_floor += 1
 
-            waiting_passangers_floor = self.passangerAtFloor(
+            waiting_passengers_floor = self.passengerAtFloor(
                 self.state, floor+1)[1]
 
             score_label = pyglet.text.Label('F' + str(floor) + ', Queue: ' +
-                                            str(waiting_passangers_floor),
+                                            str(waiting_passengers_floor),
                                             font_size=14,
                                             x=position_x,
                                             y=position_y,
@@ -599,7 +599,12 @@ class ElevatorEnv(gym.Env):
             self.step(action)
             self.render()
             print(self.decodeAction(action, 3))
-    
+            self.split_state()
+
+    def split_state(self):
+        print("Elevator Floor:", self.state[:self.elevator_num])
+        print("Elevator Passengers:", self.state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
+        print("Floor Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit:])
 
 
 if __name__ == "__main__":
@@ -607,13 +612,13 @@ if __name__ == "__main__":
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
-        kwargs={'elevator_num': 1, 'elevator_limit': 1, 'floor_num': 2, 'floor_limit': 1, 'capacity': 400, 'seed': 1},
+        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 3, 'floor_limit': 2, 'capacity': 6, 'seed': 1},
     )
     env = gym.make('Elevator-v0')
     done = False
     env.reset()
-    while not done:
-        action = np.random.randint(0, env.action_space.n)
-        _, _, done, _ = env.step(action)
-        print(done)
-        env.render()
+    # while not done:
+    #     action = np.random.randint(0, env.action_space.n)
+    #     _, _, done, _ = env.step(action)
+    #     print(done)
+    #     env.render()
