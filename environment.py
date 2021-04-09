@@ -12,6 +12,9 @@ import pyglet
 from pyglet import gl
 
 
+
+
+
 class ElevatorEnv(gym.Env):
     """
     Environment for simulating multiple elevators
@@ -22,7 +25,7 @@ class ElevatorEnv(gym.Env):
 
     there could be 3**2 combinations of actions
 
-    such as [0, 1, 2] or [1, 0, 0]
+    such as [0, 1] or [2， 0]
 
     which 0 means going down, 1 means going up, 2 means iding on current floor
 
@@ -31,7 +34,8 @@ class ElevatorEnv(gym.Env):
     which is then passed to env.step(m) to compute next state
     """
 
-    def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit, capacity, seed=None):
+    def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit, capacity, 
+    possion_lamda, step_size, seed=None):
         """
         Initializa a EGC system
 
@@ -59,7 +63,12 @@ class ElevatorEnv(gym.Env):
 
         self.valid_actions = [0, 1, 2]
 
+<<<<<<< Updated upstream
         # Index where passenger slots starts in the state array
+=======
+
+        # Index where passenger slots starts
+>>>>>>> Stashed changes
         self.passenger_start_index = self.elevator_num
         # Index where first slot of first floor starts in the state array
         self.floor_start_index = (
@@ -80,6 +89,11 @@ class ElevatorEnv(gym.Env):
         self.seed(seed)
         self.viewer = None
         self.state = None
+        
+        self.poisson = self.np_random.poisson(lam=possion_lamda, size=step_size)
+        self.step_index = 0
+
+
 
         self.steps_beyond_done = None
         self.reset()
@@ -333,6 +347,35 @@ class ElevatorEnv(gym.Env):
         state, reward, done, obj = self.nextState(action)
         self.state = state
 
+
+        # get new passengers from the poisson distribution
+        new_passengers = self.poisson[self.step_index]
+        self.step_index += 1
+
+        # randomly distribute the current number of new passengers to each floor
+        # and for each passenger, generate the destination randomly as well
+
+        for i in range(new_passengers):
+
+            random_floor = int(self.np_random.uniform(1, self.floor_num + 1))
+            random_destination = int(
+                self.np_random.uniform(1, self.floor_num + 1))
+
+            while random_floor == random_destination:
+                random_destination = int(
+                    self.np_random.uniform(1, self.floor_num + 1))
+
+            # floor_index in the state
+            stockwerk_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
+                                                                                                 self.floor_limit))
+            for k in range(0,  self.floor_limit):
+                if self.state[stockwerk_index+k] == 0:
+                    self.state[stockwerk_index+k] = random_destination
+                    break
+        
+
+        
+
         # Push first in queue out and add new state as last in queue
         if self.stateQueue.full():
             self.stateQueue.get()
@@ -352,14 +395,28 @@ class ElevatorEnv(gym.Env):
         self.state = np.zeros(self.elevator_num + (self.elevator_num *
                               self.elevator_limit) + (self.floor_num * self.floor_limit))
 
+        print("state 1:", self.state, len(self.state))
+
         # initial elevator position
         for i in range(self.elevator_num):
             self.state[i] = self.np_random.randint(1, self.floor_num+1)
             # self.state[i] = 0
 
+        print("state 2:", self.state, len(self.state))
+
+        # get new passengers from the poisson distribution
+        new_passengers = self.poisson[self.step_index]
+        self.step_index += 1
+
         # here index is 51
+<<<<<<< Updated upstream
         self.waiting_passengers = self.capacity
         for i in range(self.waiting_passengers):
+=======
+        # self.waiting_passangers = self.capacity
+        self.waiting_passangers = new_passengers
+        for i in range(self.waiting_passangers):
+>>>>>>> Stashed changes
 
             # self.state[1 + self.elevator_limit +
             #         (self.floor_num - 1) * self.floor_limit] = 1
@@ -372,14 +429,21 @@ class ElevatorEnv(gym.Env):
                 random_destination = int(
                     self.np_random.uniform(1, self.floor_num + 1))
 
+            # floor_index in the state
             stockwerk_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
                                                                                                  self.floor_limit))
+<<<<<<< Updated upstream
       
+=======
+
+            print("passenger: ", i, " floor_index:", stockwerk_index, "start:", random_floor, "dest:", random_destination)
+>>>>>>> Stashed changes
             for k in range(0,  self.floor_limit):
                 if self.state[stockwerk_index+k] == 0:
                     self.state[stockwerk_index+k] = random_destination
                     break
         self.steps_beyond_done = None
+        print("state:", self.state, len(self.state))
         return np.array(self.state)
 
     # region rendering-related methods
@@ -617,13 +681,35 @@ if __name__ == "__main__":
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
+<<<<<<< Updated upstream
         kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 3, 'floor_limit': 2, 'capacity': 6, 'seed': 1},
     )
     env = gym.make('Elevator-v0')
     done = False
     env.reset()
+=======
+        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 2, 'floor_limit': 10, 'capacity': 20, 
+        'step_size': 1000, 'possion_lamda': 50, 'seed': 1},
+    )
+    env = gym.make('Elevator-v0')
+    done = False
+    # env.reset()
+>>>>>>> Stashed changes
     # while not done:
     #     action = np.random.randint(0, env.action_space.n)
     #     _, _, done, _ = env.step(action)
     #     print(done)
     #     env.render()
+<<<<<<< Updated upstream
+=======
+    """
+    state (np.array): state of the environment, 
+                [floor of each elevator (elevator_num), 3
+                each passenger's dest inside each elevator (elevator_num * elevator_limit), 30
+                each passenger's dest on each floor (floor_num * floor_limit)] 20
+
+
+    self.state = np.zeros(self.elevator_num + (self.elevator_num *
+                              self.elevator_limit) + (self.floor_num * self.floor_limit))
+    """
+>>>>>>> Stashed changes
