@@ -64,8 +64,17 @@ class ElevatorEnv(gym.Env):
         self.total_elevator_time = 0 # sum of the time in the elevator for each passenger
         self.total_square_elevator_time = 0
         
-        self.coming_time_table = [] # floor num * floor limit
-        self.loading_time_table = [] # elevator_num * elevator_limit
+        self.waiting_time_table = [] # floor num * floor limit
+        self.traveling_time_table = [] # elevator_num * elevator_limit
+
+        # count of passengers who waited
+        self.waited = 0
+        # count of passengers who entered elevator cas
+        self.travelled = 0
+        # count of passengers who reached destinated
+        self.arrived = 0
+        self.direction = [2] * elevator_num       
+        self.new_hall_call = np.zeros((self.floor_num, 2))
         
 
         # Index where passenger slots starts in the state array
@@ -172,12 +181,13 @@ class ElevatorEnv(gym.Env):
                 count += 1
 
                 # calculate the time in the elevator for each passenger for reward
-                curr_elevator_time = self.step_index - self.loading_time_table[i-self.elevator_num]
+                curr_elevator_time = self.step_index - self.traveling_time_table[i-self.elevator_num]
                 self.total_elevator_time += curr_elevator_time
                 self.total_square_elevator_time += curr_elevator_time**2
-                self.loading_time_table[i-self.elevator_num] = 0
+                self.traveling_time_table[i-self.elevator_num] = 0
 
-        if count > 0: print("Elevator", which_elevator,"unload", count, "passengers at floor", floor)
+        # if count > 0: print("Elevator", which_elevator,"unload", count, "passengers at floor", floor)
+        self.arrived += count
         return (count > 0), count
 
     def nextPassengerSlot(self, state, which_elevator):
@@ -196,7 +206,6 @@ class ElevatorEnv(gym.Env):
     # Returns True if at least a passenger was loaded, how many where loaded, and how many where left at the floor
 
     def loadPassenger(self, state, which_elevator, floor):
-        # TODO: check the direction of passengers at this floor
         passengers_before_loading = self.passengerAtFloor(state, floor)[1]
         loaded_passengers = 0
         current_floor_index = self.floor_start_index + \
@@ -211,21 +220,19 @@ class ElevatorEnv(gym.Env):
 
                     # waiting time finishes for each passenger
                     # calculate the squared waiting time for reward
-                    self.total_square_waiting_time += (self.step_index - self.coming_time_table[i-current_floor_index])**2
-                    self.coming_time_table[i-current_floor_index] = 0
+                    # TODO: SUM of squared waiting time?
+                    self.total_square_waiting_time += (self.step_index - self.waiting_time_table[i-current_floor_index])**2
+                    self.waiting_time_table[i-current_floor_index] = 0
 
                     # record the loading time for each passenger
-                    self.loading_time_table[free_slot-self.elevator_num] = self.step_index
+                    self.traveling_time_table[free_slot-self.elevator_num] = self.step_index
 
                 elif free_slot == -1:
                     break
         #self.waiting_passengers -= loaded_passengers 
         #question: self.waiting_passengers refers to wait to be loaded? or to the dest?
         #o.w. self.waiting_passengers -= count in unloadPassenger()
-
-        
-
-
+        self.travelled += loaded_passengers
         self.total_waiting_time += self.step_index * loaded_passengers
         return (loaded_passengers > 0), loaded_passengers, (passengers_before_loading - loaded_passengers)
 
@@ -328,6 +335,10 @@ class ElevatorEnv(gym.Env):
         actions = self.decodeAction(action, 3)
         #print(action, actions)
         for i in range(self.elevator_num):
+            # update direction
+            if actions[i] != 2:
+                self.direction[i] = actions[i]
+
             # get the current floor for this elevator
             current_floor = int(state[i])
             # Decode action for this elevator
@@ -375,7 +386,7 @@ class ElevatorEnv(gym.Env):
 
         # randomly distribute the current number of new passengers to each floor
         # and for each passenger, generate the destination randomly as well
-
+        #TODO: possible overflow?
         for i in range(new_passengers):
 
             random_floor = int(self.np_random.uniform(1, self.floor_num + 1))
@@ -387,19 +398,25 @@ class ElevatorEnv(gym.Env):
                     self.np_random.uniform(1, self.floor_num + 1))
 
             # floor_index in the state
-            stockwerk_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
+            floor_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
                                                                                                  self.floor_limit))
             for k in range(0,  self.floor_limit):
-                if self.state[stockwerk_index+k] == 0:
-                    self.state[stockwerk_index+k] = random_destination
+                if self.state[floor_index+k] == 0:
+                    self.state[floor_index+k] = random_destination
                     # record the time each passenger showing up
-                    self.coming_time_table[stockwerk_index+k - self.elevator_num - (self.elevator_num*self.elevator_limit)] = self.step_index 
+                    self.waiting_time_table[floor_index+k - self.elevator_num - (self.elevator_num*self.elevator_limit)] = self.step_index 
+                    if random_destination > random_floor:
+                        self.new_hall_call[random_floor - 1, 0] = 1
+                    elif random_destination < random_floor:
+                        self.new_hall_call[random_floor - 1, 1] = 1
+                    self.waited += 1
                     break
         
 
     def step(self, action):
         state, reward, done, obj = self.nextState(action)
         self.state = state
+        self.new_hall_call = np.zeros((self.floor_num, 2))
 
         self.get_next_passengers()
 
@@ -426,24 +443,30 @@ class ElevatorEnv(gym.Env):
 
         # initial elevator position
         for i in range(self.elevator_num):
-            self.state[i] = self.np_random.randint(1, self.floor_num+1)
-            # self.state[i] = 0
+            # self.state[i] = self.np_random.randint(1, self.floor_num+1)
+            self.state[i] = 1
 
         # print("state 2:", self.state, len(self.state))
 
         # Initialize poisson distribution
         self.poisson = self.np_random.poisson(lam=self.lam, size=self.step_size)
         self.step_index = 0
+        self.travelled = 0
+        self.waiting = 0
+        self.arrived = 0
+        self.direction = [2] * self.elevator_num        
+        self.new_hall_call = np.zeros((self.floor_num, 2))
 
-        # Initialize coming_time_table
-        self.coming_time_table = np.zeros(self.floor_num * self.floor_limit)
+
+        # Initialize waiting_time_table
+        self.waiting_time_table = np.zeros(self.floor_num * self.floor_limit)
         # Initialize 
-        self.loading_time_table = np.zeros(self.elevator_num * self.elevator_limit)
+        self.traveling_time_table = np.zeros(self.elevator_num * self.elevator_limit)
 
         self.get_next_passengers()
 
         self.steps_beyond_done = None
-        self.split_state()
+        # self.split_state()
         return np.array(self.state)
     
     def floor_call_mask(self):
@@ -597,7 +620,7 @@ class ElevatorEnv(gym.Env):
             waiting_passengers_floor = self.passengerAtFloor(
                 self.state, floor+1)[1]
 
-            score_label = pyglet.text.Label('F' + str(floor) + ', Queue: ' +
+            score_label = pyglet.text.Label('F' + str(floor + 1) + ', Queue: ' +
                                             str(waiting_passengers_floor),
                                             font_size=14,
                                             x=position_x,
