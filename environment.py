@@ -1,19 +1,12 @@
 # Elevator Simulator Environment modified from https://github.com/hse-aai-2019-team3/Applied-AI-Technologies
-import math
 import gym
 from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
-import copy
 import queue
-import time
-
+# rendering library
 import pyglet
 from pyglet import gl
-
-
-
-
 
 class ElevatorEnv(gym.Env):
     """
@@ -327,7 +320,7 @@ class ElevatorEnv(gym.Env):
     def nextState(self, action):
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
-        state = copy.copy(self.state)
+        state = self.state.copy()
         
         reward = 0
 
@@ -413,7 +406,7 @@ class ElevatorEnv(gym.Env):
         # Push first in queue out and add new state as last in queue
         if self.stateQueue.full():
             self.stateQueue.get()
-        self.stateQueue.put(copy.copy(self.state))
+        self.stateQueue.put(self.state.copy())
 
         # If queue full start checking for oscillation
         if self.stateQueue.full():
@@ -443,9 +436,9 @@ class ElevatorEnv(gym.Env):
         self.step_index = 0
 
         # Initialize coming_time_table
-        self.coming_time_table = np.zeors(self.floor_num * self.floor_limit)
+        self.coming_time_table = np.zeros(self.floor_num * self.floor_limit)
         # Initialize 
-        self.loading_time_table = np.zeors(self.elevator_num * self.elevator_limit)
+        self.loading_time_table = np.zeros(self.elevator_num * self.elevator_limit)
 
         self.get_next_passengers()
 
