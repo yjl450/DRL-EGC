@@ -35,7 +35,7 @@ class ElevatorEnv(gym.Env):
     """
 
     def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit, 
-    possion_lamda, step_size, seed=None, capacity=0):
+    poisson_lambda, step_size, seed=None, capacity=0):
         """
         Initializa a EGC system
 
@@ -59,9 +59,12 @@ class ElevatorEnv(gym.Env):
         self.floor_num = floor_num
         self.floor_limit = floor_limit
         # self.capacity = capacity
-        self.waiting_passengers = capacity
-
+        self.waiting_passengers = 0
         self.valid_actions = [0, 1, 2]
+        self.step_index = 0
+        self.lam = poisson_lambda
+        self.step_size = step_size
+        self.poisson = None
 
         # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
@@ -84,9 +87,6 @@ class ElevatorEnv(gym.Env):
         self.seed(seed)
         self.viewer = None
         self.state = None
-        
-        self.poisson = self.np_random.poisson(lam=possion_lamda, size=step_size)
-        self.step_index = 0
 
         self.steps_beyond_done = None
 
@@ -334,14 +334,14 @@ class ElevatorEnv(gym.Env):
         #     reward += 400
         return state, reward, done, {}
 
-    def eval(self, action):
-        state, reward, done, obj = self.nextState(action)
-        return np.array(state), reward, done, obj
+    # deprecated
+    # def eval(self, action):
+    #     state, reward, done, obj = self.nextState(action)
+    #     return np.array(state), reward, done, obj
 
     def step(self, action):
         state, reward, done, obj = self.nextState(action)
         self.state = state
-
 
         # get new passengers from the poisson distribution
         new_passengers = self.poisson[self.step_index]
@@ -380,7 +380,7 @@ class ElevatorEnv(gym.Env):
                 if np.array_equal(queueList[0], queueList[2]) and np.array_equal(queueList[1], queueList[3]):
                     reward -= 1000000
 
-        return np.array(state), reward, done, obj
+        return self.floor_call_mask(), reward, done, obj
 
     def reset(self):
         # set here waiting_passengers
@@ -396,6 +396,9 @@ class ElevatorEnv(gym.Env):
 
         # print("state 2:", self.state, len(self.state))
 
+        # Initialize poisson distribution
+        self.poisson = self.np_random.poisson(lam=self.lam, size=self.step_size)
+        self.step_index = 0
         # get new passengers from the poisson distribution
         new_passengers = self.poisson[self.step_index]
         self.step_index += 1
@@ -428,12 +431,38 @@ class ElevatorEnv(gym.Env):
         self.steps_beyond_done = None
         self.split_state()
         return np.array(self.state)
+    
+    def floor_call_mask(self):
+        """
+        Mask the floor calls with only information of going up or down
+
+        1 means going up
+
+        -1 means going down
+
+        (0 is by default an empty slot)
+
+        Returns:
+            masked_state(ndarray): state of the environment with the floor calls masked
+        """
+
+        masked_state = self.state.copy() # deep copy
+        for i in range(self.floor_num):
+            for j in range(self.floor_limit):
+                if masked_state[self.floor_start_index + i*self.floor_limit + j]:
+                    if masked_state[self.floor_start_index + i*self.floor_limit + j] > i+1:
+                        masked_state[self.floor_start_index + i*self.floor_limit + j] = 1
+                    elif masked_state[self.floor_start_index + i*self.floor_limit + j] < i+1:
+                        masked_state[self.floor_start_index + i*self.floor_limit + j] = -1
+                    else:
+                        masked_state[self.floor_start_index + i*self.floor_limit + j] = 0
+        return masked_state
 
     # region rendering-related methods
     def render(self, episode=None, step=None, mode='human'):
         from gym.envs.classic_control import rendering
-        self.screen_width = 1280
-        self.screen_height = 720
+        self.screen_width = 640
+        self.screen_height = 480
 
         if self.viewer is None:
 
@@ -653,18 +682,22 @@ class ElevatorEnv(gym.Env):
             print(self.decodeAction(action, 3))
             self.split_state()
 
-    def split_state(self, verbose=False):
-        print("Elevator Floor:", self.state[:self.elevator_num])
+    def split_state(self, masked_view=False, verbose=True):
+        if masked_view:
+            raw_state = self.floor_call_mask()
+        else:
+            raw_state=self.state
+        print("Elevator Floor:", raw_state[:self.elevator_num])
         if self.elevator_num <= 3: 
             verbose = True
         if verbose:
             for i in range(self.elevator_num): 
-                print("Elevator", i, "Passengers:", self.state[self.elevator_num + i*self.elevator_limit: self.elevator_num + (i+1)*self.elevator_limit])
+                print("Elevator", i, "Passengers:", raw_state[self.elevator_num + i*self.elevator_limit: self.elevator_num + (i+1)*self.elevator_limit])
             for i in range(self.floor_num):    
-                print("Floor", i+1, "Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit + i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
+                print("Floor", i+1, "Passengers:", raw_state[self.elevator_num + self.elevator_num * self.elevator_limit + i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
         else:
-            print("Elevator Passengers:", self.state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
-            print("Floor Passengers:", self.state[self.elevator_num + self.elevator_num * self.elevator_limit:])
+            print("Elevator Passengers:", raw_state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
+            print("Floor Passengers:", raw_state[self.elevator_num + self.elevator_num * self.elevator_limit:])
 
 
 if __name__ == "__main__":
@@ -673,7 +706,7 @@ if __name__ == "__main__":
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
         kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 4, 'floor_limit': 20, 
-        'step_size': 1000, 'possion_lamda': 50, 'seed': 1},
+        'step_size': 1000, 'poisson_lambda': 50, 'seed': 1},
     )
     env = gym.make('Elevator-v0')
     done = False
