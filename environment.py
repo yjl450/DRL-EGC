@@ -59,12 +59,13 @@ class ElevatorEnv(gym.Env):
         self.floor_num = floor_num
         self.floor_limit = floor_limit
         # self.capacity = capacity
-        self.waiting_passengers = 0
+        # self.waiting_passengers = 0
         self.valid_actions = [0, 1, 2]
         self.step_index = 0
         self.lam = poisson_lambda
         self.step_size = step_size
         self.poisson = None
+        self.total_waiting_time = 0 # sum of every passenger's waiting time
 
         # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
@@ -201,6 +202,11 @@ class ElevatorEnv(gym.Env):
                     loaded_passengers += 1
                 elif free_slot == -1:
                     break
+        #self.waiting_passengers -= loaded_passengers 
+        #question: self.waiting_passengers refers to wait to be loaded? or to the dest?
+        #o.w. self.waiting_passengers -= count in unloadPassenger()
+
+        self.total_waiting_time += self.step_index * loaded_passengers
         return (loaded_passengers > 0), loaded_passengers, (passengers_before_loading - loaded_passengers)
 
     def elevatorMoveDown(self, state, action, which_elevator, current_floor):
@@ -329,7 +335,7 @@ class ElevatorEnv(gym.Env):
 
         # Infinite episode so no ending singal
 
-        # if self.waiting_passengers == 0:
+        # if self.waiting_passengers == 0: #! currently no self.waiting_passengers is not used 
         #     done = True
         #     reward += 400
         return state, reward, done, {}
@@ -339,10 +345,43 @@ class ElevatorEnv(gym.Env):
     #     state, reward, done, obj = self.nextState(action)
     #     return np.array(state), reward, done, obj
 
+    def get_next_passengers(self):
+        # get new passengers from the poisson distribution
+        new_passengers = self.poisson[self.step_index]
+        self.step_index += 1
+
+        # for calculating the total waiting time
+        self.total_waiting_time += self.step_index * new_passengers
+
+        # randomly distribute the current number of new passengers to each floor
+        # and for each passenger, generate the destination randomly as well
+
+        for i in range(new_passengers):
+
+            random_floor = int(self.np_random.uniform(1, self.floor_num + 1))
+            random_destination = int(
+                self.np_random.uniform(1, self.floor_num + 1))
+
+            while random_floor == random_destination:
+                random_destination = int(
+                    self.np_random.uniform(1, self.floor_num + 1))
+
+            # floor_index in the state
+            stockwerk_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
+                                                                                                 self.floor_limit))
+            for k in range(0,  self.floor_limit):
+                if self.state[stockwerk_index+k] == 0:
+                    self.state[stockwerk_index+k] = random_destination
+                    break
+        
+
     def step(self, action):
         state, reward, done, obj = self.nextState(action)
         self.state = state
 
+        self.get_next_passengers()
+
+        """
         # get new passengers from the poisson distribution
         new_passengers = self.poisson[self.step_index]
         self.step_index += 1
@@ -367,6 +406,7 @@ class ElevatorEnv(gym.Env):
                 if self.state[stockwerk_index+k] == 0:
                     self.state[stockwerk_index+k] = random_destination
                     break
+        """
 
         # Push first in queue out and add new state as last in queue
         if self.stateQueue.full():
@@ -399,6 +439,9 @@ class ElevatorEnv(gym.Env):
         # Initialize poisson distribution
         self.poisson = self.np_random.poisson(lam=self.lam, size=self.step_size)
         self.step_index = 0
+
+        self.get_next_passengers()
+        """
         # get new passengers from the poisson distribution
         new_passengers = self.poisson[self.step_index]
         self.step_index += 1
@@ -428,6 +471,7 @@ class ElevatorEnv(gym.Env):
                 if self.state[stockwerk_index+k] == 0:
                     self.state[stockwerk_index+k] = random_destination
                     break
+        """
         self.steps_beyond_done = None
         self.split_state()
         return np.array(self.state)
@@ -457,6 +501,11 @@ class ElevatorEnv(gym.Env):
                     else:
                         masked_state[self.floor_start_index + i*self.floor_limit + j] = 0
         return masked_state
+
+
+    def calculate_avg_waiting_time(self):
+        
+        return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
     # region rendering-related methods
     def render(self, episode=None, step=None, mode='human'):
