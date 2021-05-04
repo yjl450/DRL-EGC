@@ -8,6 +8,7 @@ import queue
 import pyglet
 from pyglet import gl
 
+
 class ElevatorEnv(gym.Env):
     """
     Environment for simulating multiple elevators
@@ -27,8 +28,8 @@ class ElevatorEnv(gym.Env):
     which is then passed to env.step(m) to compute next state
     """
 
-    def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit, 
-    poisson_lambda, step_size, seed=None, capacity=0):
+    def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit,
+                 poisson_lambda, step_size, seed=None, capacity=0):
         """
         Initializa a EGC system
 
@@ -59,13 +60,13 @@ class ElevatorEnv(gym.Env):
         self.step_size = step_size
         self.poisson = None
 
-        self.total_waiting_time = 0 # sum of every passenger's waiting time
+        self.total_waiting_time = 0  # sum of every passenger's waiting time
         self.total_square_waiting_time = 0
-        self.total_elevator_time = 0 # sum of the time in the elevator for each passenger
+        self.total_elevator_time = 0  # sum of the time in the elevator for each passenger
         self.total_square_elevator_time = 0
-        
-        self.waiting_time_table = [] # floor num * floor limit
-        self.traveling_time_table = [] # elevator_num * elevator_limit
+
+        self.waiting_time_table = []  # floor num * floor limit
+        self.traveling_time_table = []  # elevator_num * elevator_limit
 
         # count of passengers who waited
         self.waited = 0
@@ -73,9 +74,8 @@ class ElevatorEnv(gym.Env):
         self.travelled = 0
         # count of passengers who reached destinated
         self.arrived = 0
-        self.direction = [2] * elevator_num       
+        self.direction = [2] * elevator_num
         self.new_hall_call = np.zeros((self.floor_num, 2))
-        
 
         # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
@@ -89,7 +89,8 @@ class ElevatorEnv(gym.Env):
         self.observation_space = spaces.Discrete(
             self.elevator_num
             + (self.elevator_num * self.elevator_limit)
-            + (self.floor_limit * self.floor_num)
+            # + (self.floor_limit * self.floor_num)
+            + (self.floor_num * 2)
         )
 
         self.stateQueue = queue.Queue(maxsize=4)
@@ -181,7 +182,8 @@ class ElevatorEnv(gym.Env):
                 count += 1
 
                 # calculate the time in the elevator for each passenger for reward
-                curr_elevator_time = self.step_index - self.traveling_time_table[i-self.elevator_num]
+                curr_elevator_time = self.step_index - \
+                    self.traveling_time_table[i-self.elevator_num]
                 self.total_elevator_time += curr_elevator_time
                 self.total_square_elevator_time += curr_elevator_time**2
                 self.traveling_time_table[i-self.elevator_num] = 0
@@ -221,25 +223,28 @@ class ElevatorEnv(gym.Env):
                     # waiting time finishes for each passenger
                     # calculate the squared waiting time for reward
                     # TODO: SUM of squared waiting time?
-                    self.total_square_waiting_time += (self.step_index - self.waiting_time_table[i-current_floor_index])**2
+                    self.total_square_waiting_time += (
+                        self.step_index - self.waiting_time_table[i-current_floor_index])**2
                     self.waiting_time_table[i-current_floor_index] = 0
 
                     # record the loading time for each passenger
-                    self.traveling_time_table[free_slot-self.elevator_num] = self.step_index
+                    self.traveling_time_table[free_slot -
+                                              self.elevator_num] = self.step_index
 
                 elif free_slot == -1:
                     break
-        #self.waiting_passengers -= loaded_passengers 
-        #question: self.waiting_passengers refers to wait to be loaded? or to the dest?
+        #self.waiting_passengers -= loaded_passengers
+        # question: self.waiting_passengers refers to wait to be loaded? or to the dest?
         #o.w. self.waiting_passengers -= count in unloadPassenger()
         self.travelled += loaded_passengers
         self.total_waiting_time += self.step_index * loaded_passengers
         return (loaded_passengers > 0), loaded_passengers, (passengers_before_loading - loaded_passengers)
 
     def elevatorMoveDown(self, state, action, which_elevator, current_floor):
-        reward = 0
+        # reward = 0
         if state[which_elevator] == 1:
-            reward -= 1000000
+            # reward -= 1000000
+            pass
         else:
             # check if there is reason to go a floor up
             # is there a passenger waiting at a lower a floor?
@@ -251,22 +256,23 @@ class ElevatorEnv(gym.Env):
                 state, current_floor)
 
             # calculate rewards
-            if not passenger_at_lower_floors and not passenger_to_lower_floors:
-                reward -= 100
+            # if not passenger_at_lower_floors and not passenger_to_lower_floors:
+            #     reward -= 100
 
-            if num_passenger_at_lower_floor > 0:
-                reward += 1
+            # if num_passenger_at_lower_floor > 0:
+            #     reward += 1
 
-            if num_passenger_to_lower_floor > 0:
-                reward += 10
+            # if num_passenger_to_lower_floor > 0:
+            #     reward += 10
 
             state[which_elevator] -= 1
-        return state, reward
+        return state
 
     def elevatorMoveUp(self, state, action, which_elevator, current_floor):
         reward = 0
         if state[which_elevator] == self.floor_num:
-            reward -= 1000000
+            # reward -= 1000000
+            pass
         else:
             # check if there is reason to go a floor up
 
@@ -279,19 +285,19 @@ class ElevatorEnv(gym.Env):
                 state, current_floor)
 
             # calculate rewards
-            if not passenger_at_upper_floors and not passenger_to_upper_floors:
-                reward -= 100
+            # if not passenger_at_upper_floors and not passenger_to_upper_floors:
+            #     reward -= 100
 
-            if num_passenger_at_upper_floor > 0:
-                reward += 1
-            if num_passenger_to_upper_floor > 0:
-                reward += 10
+            # if num_passenger_at_upper_floor > 0:
+            #     reward += 1
+            # if num_passenger_to_upper_floor > 0:
+            #     reward += 10
 
             state[which_elevator] += 1
-        return state, reward
+        return state
 
     def elevatorStop(self, state, action, which_elevator, current_floor):
-        reward = 0
+        # reward = 0
         # Are there any passengers in the elevator that want to leave?
         passengers_left = False
         num_passengers_left = 0
@@ -314,22 +320,20 @@ class ElevatorEnv(gym.Env):
             #print("Passengers left at floor", num_passenger_left_at_floor)
             #print("Passengers in Elevator now",self.passengerInElevator(state))
 
-        if passengers_entered == False and passengers_left == False:
-            reward = -1000
-            #print("No one left or entered")
+        # if passengers_entered == False and passengers_left == False:
+        #     reward = -1000
+        #     #print("No one left or entered")
 
-        reward += num_passengers_left*100
-        reward += num_passengers_entered*10
-        reward -= num_passenger_left_at_floor
+        # reward += num_passengers_left*100
+        # reward += num_passengers_entered*10
+        # reward -= num_passenger_left_at_floor
 
-        return state, reward
+        return state
 
     def nextState(self, action):
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
         state = self.state.copy()
-        
-        reward = 0
 
         # Turns action to a list of actions for each elevator
         actions = self.decodeAction(action, 3)
@@ -346,27 +350,29 @@ class ElevatorEnv(gym.Env):
             #print("Elevator",i,"goes for action", specific_action)
             if specific_action == 0:
                 #print("Elevator",i,"at floor",state[i], "going down")
-                state, tmp_reward = self.elevatorMoveDown(
+                state = self.elevatorMoveDown(
                     state, specific_action, i, current_floor)
-                reward += tmp_reward
+                # reward += tmp_reward
                 #print("Elevator",i,"at floor",state[i], "went down")
             elif specific_action == 1:
                 #print("Elevator",i,"at floor",state[i], "going up")
-                state, tmp_reward = self.elevatorMoveUp(
+                state = self.elevatorMoveUp(
                     state, specific_action, i, current_floor)
-                reward += tmp_reward
+                # reward += tmp_reward
                 #print("Elevator",i,"at floor",state[i], "went up")
             elif specific_action == 2:
-                state, tmp_reward = self.elevatorStop(
+                state = self.elevatorStop(
                     state, specific_action, i, current_floor)
-                reward += tmp_reward
+                # reward += tmp_reward
                 #print("Elevator",i,"at floor",state[i], "went stopped")
             #print("Elevator",i,"at floor",state[i])
+        # \[ r_t = \sum_{i=0}^{k_h}(-t^2_{h_i}+\theta_{h_{i}}) + \sum_{j=0}^{k_c}(-t^2_{c_j}+\theta_{c_{j}})\]
+        reward = 0
         done = False
 
         # Infinite episode so no ending singal
 
-        # if self.waiting_passengers == 0: #! currently no self.waiting_passengers is not used 
+        # if self.waiting_passengers == 0: #! currently no self.waiting_passengers is not used
         #     done = True
         #     reward += 400
         return state, reward, done, {}
@@ -386,7 +392,7 @@ class ElevatorEnv(gym.Env):
 
         # randomly distribute the current number of new passengers to each floor
         # and for each passenger, generate the destination randomly as well
-        #TODO: possible overflow?
+        # TODO: possible overflow?
         for i in range(new_passengers):
 
             random_floor = int(self.np_random.uniform(1, self.floor_num + 1))
@@ -399,19 +405,19 @@ class ElevatorEnv(gym.Env):
 
             # floor_index in the state
             floor_index = int(self.elevator_num + (self.elevator_num*self.elevator_limit) + ((random_floor - 1) *
-                                                                                                 self.floor_limit))
+                                                                                             self.floor_limit))
             for k in range(0,  self.floor_limit):
                 if self.state[floor_index+k] == 0:
                     self.state[floor_index+k] = random_destination
                     # record the time each passenger showing up
-                    self.waiting_time_table[floor_index+k - self.elevator_num - (self.elevator_num*self.elevator_limit)] = self.step_index 
+                    self.waiting_time_table[floor_index+k - self.elevator_num - (
+                        self.elevator_num*self.elevator_limit)] = self.step_index
                     if random_destination > random_floor:
                         self.new_hall_call[random_floor - 1, 0] = 1
                     elif random_destination < random_floor:
                         self.new_hall_call[random_floor - 1, 1] = 1
                     self.waited += 1
                     break
-        
 
     def step(self, action):
         state, reward, done, obj = self.nextState(action)
@@ -428,9 +434,9 @@ class ElevatorEnv(gym.Env):
         # If queue full start checking for oscillation
         if self.stateQueue.full():
             queueList = np.asarray(list(self.stateQueue.queue))
-            if not np.array_equal(queueList[0], queueList[1]):
-                if np.array_equal(queueList[0], queueList[2]) and np.array_equal(queueList[1], queueList[3]):
-                    reward -= 1000000
+            # if not np.array_equal(queueList[0], queueList[1]):
+            #     if np.array_equal(queueList[0], queueList[2]) and np.array_equal(queueList[1], queueList[3]):
+            #         reward -= 1000000
 
         return self.floor_call_mask(), reward, done, obj
 
@@ -449,26 +455,27 @@ class ElevatorEnv(gym.Env):
         # print("state 2:", self.state, len(self.state))
 
         # Initialize poisson distribution
-        self.poisson = self.np_random.poisson(lam=self.lam, size=self.step_size)
+        self.poisson = self.np_random.poisson(
+            lam=self.lam, size=self.step_size)
         self.step_index = 0
         self.travelled = 0
         self.waiting = 0
         self.arrived = 0
-        self.direction = [2] * self.elevator_num        
+        self.direction = [2] * self.elevator_num
         self.new_hall_call = np.zeros((self.floor_num, 2))
-
 
         # Initialize waiting_time_table
         self.waiting_time_table = np.zeros(self.floor_num * self.floor_limit)
-        # Initialize 
-        self.traveling_time_table = np.zeros(self.elevator_num * self.elevator_limit)
+        # Initialize
+        self.traveling_time_table = np.zeros(
+            self.elevator_num * self.elevator_limit)
 
         self.get_next_passengers()
 
         self.steps_beyond_done = None
         # self.split_state()
         return np.array(self.state)
-    
+
     def floor_call_mask(self):
         """
         Mask the floor calls with only information of going up or down
@@ -483,21 +490,23 @@ class ElevatorEnv(gym.Env):
             masked_state(ndarray): state of the environment with the floor calls masked
         """
 
-        masked_state = self.state.copy() # deep copy
+        masked_state = self.state.copy()  # deep copy
+        masked_floor_call = np.zeros(self.floor_num * 2)
         for i in range(self.floor_num):
             for j in range(self.floor_limit):
                 if masked_state[self.floor_start_index + i*self.floor_limit + j]:
                     if masked_state[self.floor_start_index + i*self.floor_limit + j] > i+1:
-                        masked_state[self.floor_start_index + i*self.floor_limit + j] = 1
+                        masked_floor_call[i*2] = 1
                     elif masked_state[self.floor_start_index + i*self.floor_limit + j] < i+1:
-                        masked_state[self.floor_start_index + i*self.floor_limit + j] = -1
-                    else:
-                        masked_state[self.floor_start_index + i*self.floor_limit + j] = 0
+                        masked_floor_call[i*2 + 1] = 1
+                    if (masked_floor_call[i*2] and masked_floor_call[i*2 + 1]):
+                        break
+        masked_state = np.concatenate(
+            (masked_state[:self.floor_start_index], masked_floor_call))
         return masked_state
 
-
     def calculate_avg_waiting_time(self):
-        
+
         return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
     # region rendering-related methods
@@ -728,18 +737,30 @@ class ElevatorEnv(gym.Env):
         if masked_view:
             raw_state = self.floor_call_mask()
         else:
-            raw_state=self.state
+            raw_state = self.state
         print("Elevator Floor:", raw_state[:self.elevator_num])
-        if self.elevator_num <= 3: 
-            verbose = True
+        # if self.elevator_num <= 3:
+        #     verbose = True
         if verbose:
-            for i in range(self.elevator_num): 
-                print("Elevator", i, "Passengers:", raw_state[self.elevator_num + i*self.elevator_limit: self.elevator_num + (i+1)*self.elevator_limit])
-            for i in range(self.floor_num):    
-                print("Floor", i+1, "Passengers:", raw_state[self.elevator_num + self.elevator_num * self.elevator_limit + i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
+            for i in range(self.elevator_num):
+                print("Elevator", i, "Passengers:", raw_state[self.elevator_num + i *
+                      self.elevator_limit: self.elevator_num + (i+1)*self.elevator_limit])
+            if masked_view:
+                for i in range(self.floor_num):
+                    print("Floor", i+1, "Calls: ", end="")
+                    if raw_state[self.floor_start_index+i*2]: print("Up", end=" ")
+                    else: print("   ", end="")
+                    if raw_state[self.floor_start_index+i*2+1]: print("Down", end = "")
+                    print()
+            else:
+                for i in range(self.floor_num):
+                    print("Floor", i+1, "Passengers:", raw_state[self.elevator_num + self.elevator_num * self.elevator_limit +
+                          i*self.floor_limit:self.elevator_num + self.elevator_num * self.elevator_limit + (i+1)*self.floor_limit])
         else:
-            print("Elevator Passengers:", raw_state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
-            print("Floor Passengers:", raw_state[self.elevator_num + self.elevator_num * self.elevator_limit:])
+            print("Elevator Passengers:",
+                  raw_state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
+            print("Floor Passengers:",
+                  raw_state[self.elevator_num + self.elevator_num * self.elevator_limit:])
 
 
 if __name__ == "__main__":
@@ -747,8 +768,8 @@ if __name__ == "__main__":
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
-        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 4, 'floor_limit': 20, 
-        'step_size': 1000, 'poisson_lambda': 50, 'seed': 1},
+        kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 4, 'floor_limit': 20,
+                'step_size': 1000, 'poisson_lambda': 50, 'seed': 1},
     )
     env = gym.make('Elevator-v0')
     done = False
