@@ -45,7 +45,6 @@ def nearest_car(env, step, render=True):
     if render:
         env.render()
     while env.step_index < step:
-        print(dst)
         new_call = env.new_hall_call.copy()
         current_floors = env.state[: env.elevator_num]
         current_directions = env.direction
@@ -124,6 +123,6 @@ if __name__ == '__main__':
     # env.render_close()
 
     env = make_env(step)
-    controller('dumb_rotater', env, step, render=True)
+    controller('nearest_car', env, step, render=True)
     print(env.waited, env.travelled, env.arrived)
     env.render_close()

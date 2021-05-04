@@ -7,7 +7,7 @@ def make_env(step):
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=step,
-        kwargs={'elevator_num': 4, 'elevator_limit': 13, 'floor_num': 20, 'floor_limit': 40,
+        kwargs={'elevator_num': 4, 'elevator_limit': 13, 'floor_num': 5, 'floor_limit': 40,
                 'step_size': 500, 'poisson_lambda': 3, 'seed': 1},
     )
     env = make('Elevator-v0')
