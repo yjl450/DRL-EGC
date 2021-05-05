@@ -1,11 +1,9 @@
-from gym import register, make, logger
 import numpy as np
-from utils import make_env, env_decoder
+from gym import make
+# from utils import make_env
 
 
 def dumb_rotater(env, step, render=True):
-    if render:
-        env.render()
     env.step(env.encodeAction([2] * env.elevator_num))
     if render:
         env.render()
@@ -18,10 +16,12 @@ def dumb_rotater(env, step, render=True):
                 action[j] = 0
             elif env.state[j] == 1:
                 action[j] = 1
-        env.step(env.encodeAction(action))
+        _,r,_,_ = env.step(env.encodeAction(action))
+        # print(r)
         if render:
             env.render()
-        env.step(env.encodeAction([2] * env.elevator_num))
+        _,r,_,_ = env.step(env.encodeAction([2] * env.elevator_num))
+        # print(r)
         if render:
             env.render()
     while env.step_index < step:
@@ -32,10 +32,12 @@ def dumb_rotater(env, step, render=True):
                 action[j] = 0
             elif env.state[j] == 1:
                 action[j] = 1
-        env.step(env.encodeAction(action))
+        _,r,_,_ = env.step(env.encodeAction(action))
+        print(r)
         if render:
             env.render()
-        env.step(env.encodeAction([2] * env.elevator_num))
+        _,r,_,_ = env.step(env.encodeAction([2] * env.elevator_num))
+        print(r)
         if render:
             env.render()
 
@@ -117,12 +119,13 @@ def controller(algo, env, step, render=True):
 if __name__ == '__main__':
     step = 500
 
+    env = make("gym_elevator:Elevator-v0")#make_env(step)
+    env.reset()
+    controller('dumb_rotater', env, step, render=True)
+    print(env.waited, env.travelled, env.arrived)
+    env.render_close()
+
     # env = make_env(step)
     # controller('nearest_car', env, step, render=True)
     # print(env.waited, env.travelled, env.arrived)
     # env.render_close()
-
-    env = make_env(step)
-    controller('nearest_car', env, step, render=True)
-    print(env.waited, env.travelled, env.arrived)
-    env.render_close()
