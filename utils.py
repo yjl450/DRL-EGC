@@ -1,15 +1,16 @@
-from gym import register, make, logger
-import numpy as np
+from gym import register, make
 
-
-def make_env(step):
+def reg(step = 500):
     register(
         id='Elevator-v0',
         entry_point='environment:ElevatorEnv',
         max_episode_steps=step,
         kwargs={'elevator_num': 4, 'elevator_limit': 13, 'floor_num': 5, 'floor_limit': 40,
-                'step_size': 500, 'poisson_lambda': 3, 'seed': 1},
+                'step_size': 500, 'poisson_lambda': 3, 'seed': 1, "reward_func": 1, "unload_reward": None, "load_reward": None},
     )
+
+def make_env(step):
+    reg(step)
     env = make('Elevator-v0')
     env.reset()
     return env
