@@ -28,8 +28,8 @@ class ElevatorEnv(gym.Env):
     which is then passed to env.step(m) to compute next state
     """
 
-    def __init__(self, elevator_num, elevator_limit, floor_num, floor_limit,
-                 poisson_lambda, step_size, seed=None, capacity=0):
+    def __init__(self, elevator_num = 10, elevator_limit = 13, floor_num = 15, floor_limit=40,
+                 poisson_lambda = 5, step_size = 1000, seed=None, reward_func=1, unload_reward=None, load_reward=None, capacity=0):
         """
         Initializa a EGC system
 
@@ -76,6 +76,10 @@ class ElevatorEnv(gym.Env):
         self.arrived = 0
         self.direction = [2] * elevator_num
         self.new_hall_call = np.zeros((self.floor_num, 2))
+
+        self.reward_func = reward_func
+        self.unload_reward = unload_reward
+        self.load_reward = load_reward
 
         # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
@@ -328,7 +332,7 @@ class ElevatorEnv(gym.Env):
         # reward += num_passengers_entered*10
         # reward -= num_passenger_left_at_floor
 
-        return state
+        return state, num_passengers_left, num_passengers_entered
 
     def nextState(self, action):
         assert self.action_space.contains(
@@ -338,6 +342,7 @@ class ElevatorEnv(gym.Env):
         # Turns action to a list of actions for each elevator
         actions = self.decodeAction(action, 3)
         #print(action, actions)
+        unload_count, load_count = 0, 0
         for i in range(self.elevator_num):
             # update direction
             if actions[i] != 2:
@@ -361,13 +366,13 @@ class ElevatorEnv(gym.Env):
                 # reward += tmp_reward
                 #print("Elevator",i,"at floor",state[i], "went up")
             elif specific_action == 2:
-                state = self.elevatorStop(
+                state, unload_count, load_count = self.elevatorStop(
                     state, specific_action, i, current_floor)
                 # reward += tmp_reward
                 #print("Elevator",i,"at floor",state[i], "went stopped")
             #print("Elevator",i,"at floor",state[i])
-        # \[ r_t = \sum_{i=0}^{k_h}(-t^2_{h_i}+\theta_{h_{i}}) + \sum_{j=0}^{k_c}(-t^2_{c_j}+\theta_{c_{j}})\]
-        reward = 0
+        reward = self.get_reward(
+            unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward)
         done = False
 
         # Infinite episode so no ending singal
@@ -509,7 +514,32 @@ class ElevatorEnv(gym.Env):
 
         return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
-    # region rendering-related methods
+    def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None):
+        reward = 0
+
+        def current_waiting_time_sq(step):
+            return (self.step_index - step)**2
+
+        def current_waiting_time(step):
+            return (self.step_index - step)
+        unload_reward = unload_reward if unload_reward else self.floor_num ** 2
+        load_reward = load_reward if load_reward else self.floor_num ** 2
+        if reward_func == 1:
+            # Average squared waiting time reward in https://ieeexplore.ieee.org/document/8998335
+            # \[ r_t = \sum_{i=0}^{k_h}(-t^2_{h_i}+\theta_{h_{i}}) + \sum_{j=0}^{k_c}(-t^2_{c_j}+\theta_{c_{j}})\]
+            reward += unload_reward * unload_count + load_reward * load_count
+            reward -= sum(map(current_waiting_time_sq,
+                          self.waiting_time_table))
+            reward -= sum(map(current_waiting_time_sq,
+                          self.traveling_time_table))
+        elif reward_func == 2:
+            # Average waiting time reward
+            reward += unload_reward * unload_count + load_reward * load_count
+            reward -= sum(map(current_waiting_time, self.waiting_time_table))
+            reward -= sum(map(current_waiting_time, self.traveling_time_table))
+        return reward
+    # region rendering-related methods & Test Methods
+
     def render(self, episode=None, step=None, mode='human'):
         from gym.envs.classic_control import rendering
         self.screen_width = 640
@@ -717,7 +747,6 @@ class ElevatorEnv(gym.Env):
         for i in range(len(l)):
             toReturn += (base**i)*l[i]
         return toReturn
-    # endregion
 
     def act_render(self):
         """
@@ -748,9 +777,12 @@ class ElevatorEnv(gym.Env):
             if masked_view:
                 for i in range(self.floor_num):
                     print("Floor", i+1, "Calls: ", end="")
-                    if raw_state[self.floor_start_index+i*2]: print("Up", end=" ")
-                    else: print("   ", end="")
-                    if raw_state[self.floor_start_index+i*2+1]: print("Down", end = "")
+                    if raw_state[self.floor_start_index+i*2]:
+                        print("Up", end=" ")
+                    else:
+                        print("   ", end="")
+                    if raw_state[self.floor_start_index+i*2+1]:
+                        print("Down", end="")
                     print()
             else:
                 for i in range(self.floor_num):
@@ -761,6 +793,7 @@ class ElevatorEnv(gym.Env):
                   raw_state[self.elevator_num: self.elevator_num + self.elevator_num * self.elevator_limit])
             print("Floor Passengers:",
                   raw_state[self.elevator_num + self.elevator_num * self.elevator_limit:])
+# endregion
 
 
 if __name__ == "__main__":
@@ -769,16 +802,17 @@ if __name__ == "__main__":
         entry_point='environment:ElevatorEnv',
         max_episode_steps=1000,
         kwargs={'elevator_num': 3, 'elevator_limit': 10, 'floor_num': 4, 'floor_limit': 20,
-                'step_size': 1000, 'poisson_lambda': 50, 'seed': 1},
+                'step_size': 1000, 'poisson_lambda': 50, 'seed': 1, "reward_func":1, "unload_reward": None, "load_reward": None},
     )
     env = gym.make('Elevator-v0')
     done = False
     env.reset()
-    # while not done:
-    #     action = np.random.randint(0, env.action_space.n)
-    #     _, _, done, _ = env.step(action)
-    #     print(done)
-    #     env.render()
+    while env.step_index < 1000:
+        action = np.random.randint(0, env.action_space.n)
+        _, reward, done, _ = env.step(action)
+        print(reward)
+        # print(done)
+        env.render()
     """
     state (np.array): state of the environment, 
                 [floor of each elevator (elevator_num), 3
