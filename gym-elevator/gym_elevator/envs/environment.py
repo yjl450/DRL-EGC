@@ -29,7 +29,7 @@ class ElevatorEnv(gym.Env):
     """
 
     def __init__(self, elevator_num = 10, elevator_limit = 13, floor_num = 15, floor_limit=40,
-                 poisson_lambda = 5, step_size = 1000, seed=None, reward_func=1, unload_reward=None, load_reward=None, capacity=0):
+                 poisson_lambda = 1, step_size = 1000, seed=None, reward_func=2, unload_reward=None, load_reward=None, capacity=0):
         """
         Initializa a EGC system
 
@@ -57,7 +57,7 @@ class ElevatorEnv(gym.Env):
         self.valid_actions = [0, 1, 2]
         self.step_index = 0
         self.lam = poisson_lambda
-        self.step_size = step_size
+        self.step_size = step_size + 1
         self.poisson = None
 
         self.total_waiting_time = 0  # sum of every passenger's waiting time
@@ -90,11 +90,22 @@ class ElevatorEnv(gym.Env):
         self.action_space = spaces.Discrete(
             len(self.valid_actions)**self.elevator_num)
 
-        self.observation_space = spaces.Discrete(
-            self.elevator_num
-            + (self.elevator_num * self.elevator_limit)
-            # + (self.floor_limit * self.floor_num)
-            + (self.floor_num * 2)
+        # self.observation_space = spaces.Discrete(
+        #     self.elevator_num
+        #     + (self.elevator_num * self.elevator_limit)
+        #     # + (self.floor_limit * self.floor_num)
+        #     + (self.floor_num * 2)
+        # )
+        self.observation_space = spaces.MultiDiscrete(
+            # [
+            # self.elevator_num,
+            # (self.elevator_num * self.elevator_limit),
+            # # + (self.floor_limit * self.floor_num)
+            # (self.floor_num * 2)
+            # ]
+            [self.floor_num + 1] * self.elevator_num +
+            [self.floor_num + 1] * (self.elevator_num * self.elevator_limit) +
+            [2] * (self.floor_num * 2) 
         )
 
         self.stateQueue = queue.Queue(maxsize=4)
@@ -227,9 +238,15 @@ class ElevatorEnv(gym.Env):
                     # waiting time finishes for each passenger
                     # calculate the squared waiting time for reward
                     # TODO: SUM of squared waiting time?
+                    # DEBUG:
+                    # self.total_square_waiting_time += (
+                    #     self.step_index - self.waiting_time_table[i-current_floor_index])**2
+                    # self.total_waiting_time += self.step_index - self.waiting_time_table[i-current_floor_index]
+                    # self.waiting_time_table[i-current_floor_index] = 0
                     self.total_square_waiting_time += (
-                        self.step_index - self.waiting_time_table[i-current_floor_index])**2
-                    self.waiting_time_table[i-current_floor_index] = 0
+                        self.step_index - self.waiting_time_table[i-self.floor_start_index])**2
+                    self.total_waiting_time += self.step_index - self.waiting_time_table[i-self.floor_start_index]
+                    self.waiting_time_table[i-self.floor_start_index] = 0
 
                     # record the loading time for each passenger
                     self.traveling_time_table[free_slot -
@@ -241,7 +258,6 @@ class ElevatorEnv(gym.Env):
         # question: self.waiting_passengers refers to wait to be loaded? or to the dest?
         #o.w. self.waiting_passengers -= count in unloadPassenger()
         self.travelled += loaded_passengers
-        self.total_waiting_time += self.step_index * loaded_passengers
         return (loaded_passengers > 0), loaded_passengers, (passengers_before_loading - loaded_passengers)
 
     def elevatorMoveDown(self, state, action, which_elevator, current_floor):
@@ -392,8 +408,8 @@ class ElevatorEnv(gym.Env):
         new_passengers = self.poisson[self.step_index]
         self.step_index += 1
 
-        # for calculating the total waiting time
-        self.total_waiting_time -= self.step_index * new_passengers
+        # TODO: necessary? for calculating the total waiting time
+        # self.total_waiting_time -= self.step_index * new_passengers
 
         # randomly distribute the current number of new passengers to each floor
         # and for each passenger, generate the destination randomly as well
@@ -446,6 +462,14 @@ class ElevatorEnv(gym.Env):
         return self.floor_call_mask(), reward, done, obj
 
     def reset(self):
+        self.total_waiting_time = 0  # sum of every passenger's waiting time
+        self.total_square_waiting_time = 0
+        self.total_elevator_time = 0  # sum of the time in the elevator for each passenger
+        self.total_square_elevator_time = 0
+
+        self.waiting_time_table = []  # floor num * floor limit
+        self.traveling_time_table = []  # elevator_num * elevator_limit
+
         # set here waiting_passengers
         self.state = np.zeros(self.elevator_num + (self.elevator_num *
                               self.elevator_limit) + (self.floor_num * self.floor_limit))
@@ -479,7 +503,7 @@ class ElevatorEnv(gym.Env):
 
         self.steps_beyond_done = None
         # self.split_state()
-        return np.array(self.state)
+        return self.floor_call_mask()
 
     def floor_call_mask(self):
         """
@@ -510,9 +534,14 @@ class ElevatorEnv(gym.Env):
             (masked_state[:self.floor_start_index], masked_floor_call))
         return masked_state
 
-    def calculate_avg_waiting_time(self):
+    @property
+    def avg_waiting_time(self):
+        return self.total_waiting_time/self.travelled
+        # return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
-        return self.total_waiting_time/sum(self.poisson[:self.step_index])
+    @property
+    def avg_travelling_time(self):
+        return self.total_elevator_time/self.arrived
 
     def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None):
         reward = 0
@@ -522,6 +551,7 @@ class ElevatorEnv(gym.Env):
 
         def current_waiting_time(step):
             return (self.step_index - step)
+
         unload_reward = unload_reward if unload_reward else self.floor_num ** 2
         load_reward = load_reward if load_reward else self.floor_num ** 2
         if reward_func == 1:
@@ -532,11 +562,16 @@ class ElevatorEnv(gym.Env):
                           self.waiting_time_table))
             reward -= sum(map(current_waiting_time_sq,
                           self.traveling_time_table))
+            reward = abs(1e10/reward)
         elif reward_func == 2:
             # Average waiting time reward
             reward += unload_reward * unload_count + load_reward * load_count
             reward -= sum(map(current_waiting_time, self.waiting_time_table))
             reward -= sum(map(current_waiting_time, self.traveling_time_table))
+            reward = abs(1e6/reward)
+
+        elif reward_func == 3:
+            pass
         return reward
     # region rendering-related methods & Test Methods
 
@@ -810,7 +845,7 @@ if __name__ == "__main__":
     while env.step_index < 1000:
         action = np.random.randint(0, env.action_space.n)
         _, reward, done, _ = env.step(action)
-        print(reward)
+        # print(reward)
         # print(done)
         env.render()
     """
