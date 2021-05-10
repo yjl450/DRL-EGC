@@ -398,7 +398,7 @@ class ElevatorEnv(gym.Env):
         reward = self.get_reward(
             unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward, self.discount)
 
-        done = self.step_index == (self.step_size)
+        done = self.step_index >= (self.step_size)
 
         # Infinite episode so no ending singal
 
