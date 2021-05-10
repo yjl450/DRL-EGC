@@ -178,7 +178,7 @@ def main():
     if args.demo:
         env = make_batch_env(True)
         eval_stats = experiments.eval_performance(
-            env=args.env,
+            env=env,
             agent=agent,
             n_steps=None,
             n_episodes=args.eval_n_runs,
