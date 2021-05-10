@@ -57,7 +57,7 @@ class ElevatorEnv(gym.Env):
         self.valid_actions = [0, 1, 2]
         self.step_index = 0
         self.lam = poisson_lambda
-        self.step_size = step_size + 1
+        self.step_size = step_size
         self.poisson = None
 
         self.total_waiting_time = 0  # sum of every passenger's waiting time
@@ -398,7 +398,7 @@ class ElevatorEnv(gym.Env):
         reward = self.get_reward(
             unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward, self.discount)
 
-        done = False
+        done = self.step_index == (self.step_size)
 
         # Infinite episode so no ending singal
 
@@ -493,7 +493,7 @@ class ElevatorEnv(gym.Env):
 
         # Initialize poisson distribution
         self.poisson = self.np_random.poisson(
-            lam=self.lam, size=self.step_size)
+            lam=self.lam, size=self.step_size+1)
         self.step_index = 0
         self.travelled = 0
         self.waiting = 0
