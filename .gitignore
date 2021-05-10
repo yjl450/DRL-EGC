@@ -128,7 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# possible training file
 results/
 data/
-
-module.sh
+*.out

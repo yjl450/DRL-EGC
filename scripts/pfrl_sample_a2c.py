@@ -14,7 +14,7 @@ from torch import nn
 
 import pfrl
 from pfrl import experiments, utils
-from pfrl.agents import PPO
+from pfrl.agents import A3C
 
 
 def main():
@@ -110,6 +110,7 @@ def main():
     assert process_seeds.max() < 2 ** 32
 
     args.outdir = experiments.prepare_output_dir(args, args.outdir)
+    print("Output files are saved in {}".format(args.outdir))
 
     def make_env(process_idx, test):
         env = gym.make(args.env)
@@ -120,7 +121,9 @@ def main():
         # Cast observations to float32 because our model uses float32
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
-            env = pfrl.wrappers.Monitor(env, args.outdir)
+            env = pfrl.wrappers.Monitor(
+                env, args.outdir, mode="evaluation" if test else "training"
+            )
         if args.render:
             env = pfrl.wrappers.Render(env)
         return env
@@ -190,7 +193,7 @@ def main():
 
     opt = torch.optim.Adam(model.parameters(), lr=3e-4, eps=1e-5)
 
-    agent = PPO(
+    agent = A3C(
         model,
         opt,
         obs_normalizer=obs_normalizer,
