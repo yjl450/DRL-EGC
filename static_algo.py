@@ -17,11 +17,11 @@ def dumb_rotater(env, step, render=True):
             elif env.state[j] == 1:
                 action[j] = 1
         _,r,_,_ = env.step(env.encodeAction(action))
-        # print(r)
+        print(r)
         if render:
             env.render()
         _,r,_,_ = env.step(env.encodeAction([2] * env.elevator_num))
-        # print(r)
+        print(r)
         if render:
             env.render()
     while env.step_index < step:
@@ -52,8 +52,8 @@ def nearest_car(env, step, render=True):
         current_directions = env.direction
         for i in range(env.elevator_num):
             for j in range(env.elevator_limit):
-                if env.state[env.elevator_num + i * env.elevator_num * env.elevator_limit + j]:
-                    dst[i, int(env.state[env.elevator_num + i * env.elevator_num * env.elevator_limit + j]) - 1]
+                if env.state[env.elevator_num + i * env.elevator_limit + j]:
+                    dst[i, int(env.state[env.elevator_num + i * env.elevator_limit + j]) - 1]
         for i in range(env.floor_num):
             if new_call[i][0] == 1: # up call
                 nearest = 0
@@ -117,15 +117,17 @@ def controller(algo, env, step, render=True):
 
 
 if __name__ == '__main__':
-    step = 500
+    step = 1000
 
     env = make("gym_elevator:Elevator-v0")#make_env(step)
     env.reset()
     controller('dumb_rotater', env, step, render=True)
-    print(env.waited, env.travelled, env.arrived)
+    print(env.waited, env.travelled, env.arrived, env.avg_waiting_time, env.avg_travelling_time)
     env.render_close()
 
-    # env = make_env(step)
-    # controller('nearest_car', env, step, render=True)
-    # print(env.waited, env.travelled, env.arrived)
+
+    # env = make("gym_elevator:Elevator-v0")#make_env(step)
+    # env.reset()
+    # controller('nearest_car', env, step, render=False)
+    # print(env.waited, env.travelled, env.arrived, env.avg_waiting_time, env.avg_travelling_time)
     # env.render_close()
