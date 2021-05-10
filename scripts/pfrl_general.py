@@ -71,7 +71,7 @@ def main():
             # Scale rewards (and thus returns) to a reasonable range so that
             # training is easier
             env = pfrl.wrappers.ScaleReward(env, args.reward_scale_factor)
-        if args.render and not test:
+        if args.render:
             env = pfrl.wrappers.Render(env)
         return env
 
