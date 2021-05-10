@@ -3,7 +3,6 @@ astor==0.8.1
 atari-py==0.2.6
 atomicwrites==1.4.0
 attrs==20.3.0
-autopep8 @ file:///tmp/build/80754af9/autopep8_1615918855173/work
 backcall==0.2.0
 box2d-py==2.3.8
 cached-property==1.5.2
