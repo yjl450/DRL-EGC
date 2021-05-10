@@ -168,15 +168,8 @@ def main():
                     0
                 ]
             )
-    def make_batch_env(test):
-        return pfrl.envs.MultiprocessVectorEnv(
-            [
-                functools.partial(make_env, idx, test)
-                for idx, env in enumerate(range(args.num_demo_envs))
-            ]
-        )
     if args.demo:
-        env = make_batch_env(True)
+        env = make_env(0, True)
         eval_stats = experiments.eval_performance(
             env=env,
             agent=agent,
