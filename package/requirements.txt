@@ -74,8 +74,6 @@ rlschool==1.0.1
 rsa==4.7.2
 scipy==1.6.2
 seaborn==0.8.1
-six @ file:///C:/ci/six_1605205426665/work
--e git+https://github.com/yjl450/DRL-EGC.git@0d6f6309e6964e15f4cedb6cf3ab1406b1b7bb89#egg=spinup&subdirectory=spiningup
 stable-baselines3==1.0
 tensorboard==2.5.0
 tensorboard-data-server==0.6.0
@@ -84,7 +82,6 @@ tensorflow==1.15.0
 tensorflow-estimator==1.15.1
 termcolor==1.1.0
 tianshou==0.4.1
-toml @ file:///tmp/build/80754af9/toml_1616166611790/work
 torch==1.8.1
 torch-tb-profiler==0.1.0
 torchaudio==0.8.1
@@ -92,7 +89,6 @@ torchvision==0.9.1
 tqdm==4.59.0
 traitlets==5.0.5
 trimesh==3.9.15
-typing-extensions @ file:///home/ktietz/src/ci_mi/typing_extensions_1612808209620/work
 urllib3==1.26.4
 wcwidth==0.2.5
 Werkzeug==1.0.1
