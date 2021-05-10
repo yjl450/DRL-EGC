@@ -1,6 +1,7 @@
 import gym
 import argparse
 import os
+import functools
 
 # Prevent numpy from using multiple threads
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -46,6 +47,9 @@ def main():
     )
     parser.add_argument("--load", type=str, default="")
     parser.add_argument("--reward", type=int, default=1)
+    parser.add_argument(
+        "--num-demo-envs", type=int, default=1, help="Number of demo envs run in parallel."
+    )
     parser.add_argument(
         "--log-level",
         type=int,
@@ -164,14 +168,21 @@ def main():
                     0
                 ]
             )
-
+    def make_batch_env(test):
+        return pfrl.envs.MultiprocessVectorEnv(
+            [
+                functools.partial(make_env, idx, test)
+                for idx, env in enumerate(range(args.num_demo_envs))
+            ]
+        )
     if args.demo:
+        env = make_batch_env(True)
         eval_stats = experiments.eval_performance(
-            env=env,
+            env=args.env,
             agent=agent,
             n_steps=None,
             n_episodes=args.eval_n_runs,
-            max_episode_len=timestep_limit,
+            max_episode_len=args.steps,
         )
         print(
             "n_steps: {} mean: {} median: {} stdev: {}".format(
