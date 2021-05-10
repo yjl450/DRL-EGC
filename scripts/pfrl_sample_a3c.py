@@ -1,7 +1,6 @@
 import gym
 import argparse
 import os
-import functools
 
 # Prevent numpy from using multiple threads
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -36,6 +35,7 @@ def main():
     parser.add_argument("--beta", type=float, default=1e-2)
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--steps", type=int, default=10000000)
+    parser.add_argument("--max-episode-steps", type=int, default=1000)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--eval-interval", type=int, default=25000)
     parser.add_argument("--eval-n-runs", type=int, default=100)
@@ -95,7 +95,7 @@ def main():
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
         env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=3,
-                       floor_limit=10, step_size=args.steps, poisson_lambda=1, 
+                       floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
                        seed=env_seed, reward_func=args.reward, unload_reward=100, 
                        load_reward=100, discount=None)
         env = pfrl.wrappers.CastObservationToFloat32(env)
@@ -133,6 +133,14 @@ def main():
             nn.Linear(256, 1),
         ),
     )
+    # print(model)
+    # sample_env = make_env(0, False)
+    # sample_env.reset()
+    # a,v,c,d = sample_env.step(0)
+    # result = model(torch.from_numpy(a))
+    # print(result[0]._param)
+    # print(result[1])
+    # return
 
     # SharedRMSprop is same as torch.optim.RMSprop except that it initializes
     # its state in __init__, allowing it to be moved to shared memory.
