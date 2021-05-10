@@ -29,7 +29,7 @@ class ElevatorEnv(gym.Env):
     """
 
     def __init__(self, elevator_num = 10, elevator_limit = 13, floor_num = 15, floor_limit=40,
-                 poisson_lambda = 1, step_size = 1000, seed=None, reward_func=2, unload_reward=None, load_reward=None, capacity=0):
+                 poisson_lambda = 1, step_size = 1000, seed=None, reward_func=2, unload_reward=None, load_reward=None, discount = None, capacity=0):
         """
         Initializa a EGC system
 
@@ -80,6 +80,9 @@ class ElevatorEnv(gym.Env):
         self.reward_func = reward_func
         self.unload_reward = unload_reward
         self.load_reward = load_reward
+
+        self.reward_3 = [[],[]]
+        self.discount = discount
 
         # Index where passenger slots starts in the state array
         self.passenger_start_index = self.elevator_num
@@ -201,6 +204,7 @@ class ElevatorEnv(gym.Env):
                     self.traveling_time_table[i-self.elevator_num]
                 self.total_elevator_time += curr_elevator_time
                 self.total_square_elevator_time += curr_elevator_time**2
+                self.reward_3[1].append(curr_elevator_time)
                 self.traveling_time_table[i-self.elevator_num] = 0
 
         # if count > 0: print("Elevator", which_elevator,"unload", count, "passengers at floor", floor)
@@ -246,6 +250,7 @@ class ElevatorEnv(gym.Env):
                     self.total_square_waiting_time += (
                         self.step_index - self.waiting_time_table[i-self.floor_start_index])**2
                     self.total_waiting_time += self.step_index - self.waiting_time_table[i-self.floor_start_index]
+                    self.reward_3[0].append(self.step_index - self.waiting_time_table[i-self.floor_start_index])
                     self.waiting_time_table[i-self.floor_start_index] = 0
 
                     # record the loading time for each passenger
@@ -266,6 +271,7 @@ class ElevatorEnv(gym.Env):
             # reward -= 1000000
             pass
         else:
+            self.last=True
             # check if there is reason to go a floor up
             # is there a passenger waiting at a lower a floor?
             passenger_at_lower_floors, num_passenger_at_lower_floor = self.passengerAtLowerFloor(
@@ -294,6 +300,7 @@ class ElevatorEnv(gym.Env):
             # reward -= 1000000
             pass
         else:
+            self.last = True
             # check if there is reason to go a floor up
 
             # is there a passenger waiting at a higher a floor?
@@ -353,8 +360,9 @@ class ElevatorEnv(gym.Env):
     def nextState(self, action):
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
+        self.last=False
         state = self.state.copy()
-
+        self.reward_3 = [[], []]
         # Turns action to a list of actions for each elevator
         actions = self.decodeAction(action, 3)
         #print(action, actions)
@@ -388,7 +396,8 @@ class ElevatorEnv(gym.Env):
                 #print("Elevator",i,"at floor",state[i], "went stopped")
             #print("Elevator",i,"at floor",state[i])
         reward = self.get_reward(
-            unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward)
+            unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward, self.discount)
+
         done = False
 
         # Infinite episode so no ending singal
@@ -458,7 +467,6 @@ class ElevatorEnv(gym.Env):
             # if not np.array_equal(queueList[0], queueList[1]):
             #     if np.array_equal(queueList[0], queueList[2]) and np.array_equal(queueList[1], queueList[3]):
             #         reward -= 1000000
-
         return self.floor_call_mask(), reward, done, obj
 
     def reset(self):
@@ -492,7 +500,7 @@ class ElevatorEnv(gym.Env):
         self.arrived = 0
         self.direction = [2] * self.elevator_num
         self.new_hall_call = np.zeros((self.floor_num, 2))
-
+        self.reward_3 = [[],[]]
         # Initialize waiting_time_table
         self.waiting_time_table = np.zeros(self.floor_num * self.floor_limit)
         # Initialize
@@ -543,9 +551,8 @@ class ElevatorEnv(gym.Env):
     def avg_travelling_time(self):
         return self.total_elevator_time/self.arrived
 
-    def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None):
+    def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None, discount=None):
         reward = 0
-
         def current_waiting_time_sq(step):
             return (self.step_index - step)**2
 
@@ -562,16 +569,26 @@ class ElevatorEnv(gym.Env):
                           self.waiting_time_table))
             reward -= sum(map(current_waiting_time_sq,
                           self.traveling_time_table))
-            reward = abs(1e10/reward)
+            # reward = abs(1e10/reward)
         elif reward_func == 2:
             # Average waiting time reward
             reward += unload_reward * unload_count + load_reward * load_count
             reward -= sum(map(current_waiting_time, self.waiting_time_table))
             reward -= sum(map(current_waiting_time, self.traveling_time_table))
-            reward = abs(1e6/reward)
+            # reward = abs(1e6/reward)
 
         elif reward_func == 3:
-            pass
+            discount = discount or 0.99
+            if len(self.reward_3[0]) > 0:
+                for i in self.reward_3[0]:
+                    reward += load_reward * (discount ** i)
+            if len(self.reward_3[1]) > 0:
+                for i in self.reward_3[1]:
+                    reward += unload_reward * (discount ** i)
+            reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
+
+        elif reward_func == 4 and self.last:
+            reward = 1000
         return reward
     # region rendering-related methods & Test Methods
 
@@ -726,7 +743,7 @@ class ElevatorEnv(gym.Env):
                           50 + self.floor_padding * current_floor, 0)
         gl.glEnd()
 
-    def render_close(self):
+    def close(self):
         """
         Stop rendering
         """
@@ -790,7 +807,7 @@ class ElevatorEnv(gym.Env):
         while True:
             action = int(input())
             if action == -1:
-                self.render_close()
+                self.close()
                 return
             self.step(action)
             self.render()
