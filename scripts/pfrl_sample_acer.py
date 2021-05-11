@@ -10,7 +10,7 @@ from torch import nn  # NOQA:E402
 
 import pfrl  # NOQA:E402
 from pfrl import experiments, utils  # NOQA:E402
-from pfrl.agents.a3c import A3C # NOQA:E402
+from pfrl.agents.acer import ACER # NOQA:E402
 from pfrl.optimizers import SharedRMSpropEpsInsideSqrt  # NOQA:E402
 from pfrl.policies import SoftmaxCategoricalHead  # NOQA:E402
 
@@ -96,11 +96,10 @@ def main():
         # Use different random seeds for train and test envs
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
-        env = gym.make(args.env)
-        #, elevator_num=2, elevator_limit=10, floor_num=3,
-                    #    floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
-                    #    seed=env_seed, reward_func=args.reward, unload_reward=100, 
-                    #    load_reward=100, discount=None)
+        env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=3,
+                       floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
+                       seed=env_seed, reward_func=args.reward, unload_reward=100, 
+                       load_reward=100, discount=None) 
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
             env = pfrl.wrappers.Monitor(
@@ -158,7 +157,7 @@ def main():
         # Feature extractor
         return np.asarray(x, dtype=np.float32) / 255
 
-    agent = A3C(
+    agent = ACER(
         model,
         opt,
         t_max=args.t_max,

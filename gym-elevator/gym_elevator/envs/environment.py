@@ -399,6 +399,8 @@ class ElevatorEnv(gym.Env):
             unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward, self.discount)
 
         done = self.step_index >= (self.step_size)
+        if done:
+            print("ATT:",self.avg_travelling_time, "AWT:", self.avg_waiting_time)
 
         # Infinite episode so no ending singal
 
@@ -544,12 +546,12 @@ class ElevatorEnv(gym.Env):
 
     @property
     def avg_waiting_time(self):
-        return self.total_waiting_time/self.travelled
+        return self.total_waiting_time/(self.travelled + 0.000000000001)
         # return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
     @property
     def avg_travelling_time(self):
-        return self.total_elevator_time/self.arrived
+        return self.total_elevator_time/(self.arrived + 0.000000000001)
 
     def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None, discount=None):
         reward = 0
@@ -587,8 +589,10 @@ class ElevatorEnv(gym.Env):
                     reward += unload_reward * (discount ** i)
             reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
 
-        elif reward_func == 4 and self.last:
-            reward = 1000
+        elif reward_func == 4:
+            reward = unload_count * 10000 + load_count * 1000 + 1
+            # if reward != 1:
+            #     print(reward,"******************************************************"*25)
         return reward
     # region rendering-related methods & Test Methods
 

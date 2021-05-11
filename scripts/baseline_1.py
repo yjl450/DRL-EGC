@@ -1,6 +1,6 @@
 import gym
 
-from stable_baselines3 import DQN, A2C
+from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
 
@@ -9,7 +9,7 @@ env = gym.make('gym_elevator:Elevator-v0')
 
 # Instantiate the agent
 # model = DQN('MlpPolicy', env, verbose=1)
-model = A2C("MlpPolicy", env, verbose=1, learning_rate=1e-2)
+model = PPO("MlpPolicy", env, verbose=1, learning_rate=1e-3)
 # Train the agent
 model.learn(total_timesteps=int(60000))
 # Save the agent
@@ -32,4 +32,4 @@ for i in range(1000):
     action, _states = model.predict(obs, deterministic=True)
     print(action)
     obs, rewards, dones, info = env.step(action)
-    env.render()
+    # env.render()
