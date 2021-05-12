@@ -471,6 +471,41 @@ class ElevatorEnv(gym.Env):
             #         reward -= 1000000
         return self.floor_call_mask(), reward, done, obj
 
+    def get_total_waiting_time(self):
+        total = 0
+        for time in self.waiting_time_table:
+            total += self.step_index - time
+
+        total += self.total_waiting_time
+        return total
+
+    def get_total_squared_waiting_time(self):
+        total = 0
+        for time in self.waiting_time_table:
+            total += (self.step_index - time)**2
+
+        total += self.total_square_waiting_time
+        return total
+
+    def get_total_traveling_time(self):
+        total = 0
+        for time in self.traveling_time_table:
+            total += self.step_index - time
+        
+        total += self.total_elevator_time
+        return total
+
+    def get_total_square_traveling_time(self):
+        total = 0
+        for time in self.traveling_time_table:
+            total += (self.step_index - time)**2
+        
+        total += self.total_square_elevator_time
+        return total
+        
+
+
+
     def reset(self):
         self.total_waiting_time = 0  # sum of every passenger's waiting time
         self.total_square_waiting_time = 0
