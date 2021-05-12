@@ -30,7 +30,6 @@ from pfrl.agents.double_dqn import DoubleDQN
 def main():
     import logging
 
-    logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -45,29 +44,30 @@ def main():
     parser.add_argument("--env", type=str, default="gym_elevator:Elevator-v0")
     parser.add_argument("--seed", type=int, default=0, help="Random seed [0, 2 ** 32)")
     parser.add_argument("--gpu", type=int, default=-1)
-    parser.add_argument("--final-exploration-steps", type=int, default=10 ** 4)
+    parser.add_argument("--final-exploration-steps", type=int, default=10 ** 7)
     parser.add_argument("--start-epsilon", type=float, default=1.0)
     parser.add_argument("--end-epsilon", type=float, default=0.1)
     parser.add_argument("--noisy-net-sigma", type=float, default=None)
     parser.add_argument("--demo", action="store_true", default=False)
     parser.add_argument("--load", type=str, default=None)
-    parser.add_argument("--steps", type=int, default=10 ** 5)
+    parser.add_argument("--setting", type=str, default=None)
+    parser.add_argument("--steps", type=int, default=10 ** 10)
     parser.add_argument("--prioritized-replay", action="store_true")
-    parser.add_argument("--replay-start-size", type=int, default=10000)
+    parser.add_argument("--replay-start-size", type=int, default=100000)
     parser.add_argument("--target-update-interval", type=int, default=1000)
-    parser.add_argument("--target-update-method", type=str, default="hard")
+    parser.add_argument("--target-update-method", type=str, default="soft")
     parser.add_argument("--soft-update-tau", type=float, default=1e-2)
     parser.add_argument("--update-interval", type=int, default=1000)
     parser.add_argument("--eval-n-runs", type=int, default=20)
     parser.add_argument("--eval-interval", type=int, default=10 ** 4)
     parser.add_argument("--n-hidden-channels", type=int, default=20)
     parser.add_argument("--n-hidden-layers", type=int, default=2)
-    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gamma", type=float, default=1)
     parser.add_argument("--minibatch-size", type=int, default=None)
     parser.add_argument("--render-train", action="store_true")
     parser.add_argument("--render-eval", action="store_true")
     parser.add_argument("--monitor", action="store_true")
-    parser.add_argument("--reward-scale-factor", type=float, default=1e-3)
+    parser.add_argument("--reward-scale-factor", type=float, default=1)
     parser.add_argument( 
         "--actor-learner",
         action="store_true",
@@ -83,12 +83,19 @@ def main():
         ),
     )  # NOQA
     args = parser.parse_args()
+    print(args)
+
 
     # Set a random seed used in PFRL
     utils.set_random_seed(args.seed)
 
     args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
     print("Output files are saved in {}".format(args.outdir))
+
+    logging.basicConfig(filename=args.outdir + "/train_eval.log",
+                            filemode='a',level=logging.INFO)
+
+    logger = logging.getLogger(__name__)
 
     # Set different random seeds for different subprocesses.
     # If seed=0 and processes=4, subprocess seeds are [0, 1, 2, 3].
@@ -186,6 +193,7 @@ def main():
             n_steps=None,
             n_episodes=args.eval_n_runs,
             max_episode_len=timestep_limit,
+            logger=logger
         )
         print(
             "n_runs: {} mean: {} median: {} stdev {}".format(
@@ -214,6 +222,8 @@ def main():
             outdir=args.outdir,
             eval_env=eval_env,
             train_max_episode_len=timestep_limit,
+            logger=logger
+
             # eval_during_episode=True,
         )
     else:
@@ -247,6 +257,8 @@ def main():
             outdir=args.outdir,
             stop_event=learner.stop_event,
             exception_event=exception_event,
+            logger=logger
+
         )
 
         poller.stop()

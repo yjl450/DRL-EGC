@@ -269,7 +269,7 @@ class ElevatorEnv(gym.Env):
         # reward = 0
         if state[which_elevator] == 1:
             # reward -= 1000000
-            pass
+            self.punish = True
         else:
             self.last=True
             # check if there is reason to go a floor up
@@ -298,7 +298,7 @@ class ElevatorEnv(gym.Env):
         reward = 0
         if state[which_elevator] == self.floor_num:
             # reward -= 1000000
-            pass
+            self.punish = True
         else:
             self.last = True
             # check if there is reason to go a floor up
@@ -363,6 +363,7 @@ class ElevatorEnv(gym.Env):
         self.last=False
         state = self.state.copy()
         self.reward_3 = [[], []]
+        self.punish = False
         # Turns action to a list of actions for each elevator
         actions = self.decodeAction(action, 3)
         #print(action, actions)
@@ -617,17 +618,20 @@ class ElevatorEnv(gym.Env):
         elif reward_func == 3:
             discount = discount or 0.99
             if len(self.reward_3[0]) > 0:
+                # print("A")
                 for i in self.reward_3[0]:
                     reward += load_reward * (discount ** i)
             if len(self.reward_3[1]) > 0:
+                # print("B")
                 for i in self.reward_3[1]:
                     reward += unload_reward * (discount ** i)
-            reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
+            if self.punish:
+                reward = -100
+            # if reward != -100: print("A")
+            # reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
 
         elif reward_func == 4:
             reward = unload_count * 10000 + load_count * 1000 + 1
-            # if reward != 1:
-            #     print(reward,"******************************************************"*25)
         return reward
     # region rendering-related methods & Test Methods
 

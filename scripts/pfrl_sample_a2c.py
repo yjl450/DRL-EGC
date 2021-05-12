@@ -14,13 +14,14 @@ from torch import nn
 
 import pfrl
 from pfrl import experiments, utils
-from pfrl.agents import A3C
+from pfrl.agents import A2C
 
 
 def main():
     import logging
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--processes", type=int, default=1)
     parser.add_argument(
         "--gpu", type=int, default=-1, help="GPU to use, set to -1 if no GPU."
     )
@@ -193,19 +194,13 @@ def main():
 
     opt = torch.optim.Adam(model.parameters(), lr=3e-4, eps=1e-5)
 
-    agent = A3C(
+    agent = A2C(
         model,
         opt,
-        obs_normalizer=obs_normalizer,
         gpu=args.gpu,
-        update_interval=args.update_interval,
-        minibatch_size=args.batch_size,
-        epochs=args.epochs,
-        clip_eps_vf=None,
-        entropy_coef=0,
-        standardize_advantages=True,
+        entropy_coeff=0,
         gamma=0.995,
-        lambd=0.97,
+        num_processes= args.processes
     )
 
     if args.load or args.load_pretrained:
