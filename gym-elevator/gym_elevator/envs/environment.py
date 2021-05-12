@@ -71,7 +71,7 @@ class ElevatorEnv(gym.Env):
         # count of passengers who waited
         self.waited = 0
         # count of passengers who entered elevator cas
-        self.travelled = 0
+        self.traveled = 0
         # count of passengers who reached destinated
         self.arrived = 0
         self.direction = [2] * elevator_num
@@ -262,7 +262,7 @@ class ElevatorEnv(gym.Env):
         #self.waiting_passengers -= loaded_passengers
         # question: self.waiting_passengers refers to wait to be loaded? or to the dest?
         #o.w. self.waiting_passengers -= count in unloadPassenger()
-        self.travelled += loaded_passengers
+        self.traveled += loaded_passengers
         return (loaded_passengers > 0), loaded_passengers, (passengers_before_loading - loaded_passengers)
 
     def elevatorMoveDown(self, state, action, which_elevator, current_floor):
@@ -401,7 +401,7 @@ class ElevatorEnv(gym.Env):
 
         done = self.step_index >= (self.step_size)
         if done:
-            print("ATT:",self.avg_travelling_time, "AWT:", self.avg_waiting_time)
+            print("ATT:",self.avg_traveling_time, "AWT:", self.avg_waiting_time)
 
         # Infinite episode so no ending singal
 
@@ -503,9 +503,6 @@ class ElevatorEnv(gym.Env):
         
         total += self.total_square_elevator_time
         return total
-        
-
-
 
     def reset(self):
         self.total_waiting_time = 0  # sum of every passenger's waiting time
@@ -533,7 +530,7 @@ class ElevatorEnv(gym.Env):
         self.poisson = self.np_random.poisson(
             lam=self.lam, size=self.step_size+1)
         self.step_index = 0
-        self.travelled = 0
+        self.traveled = 0
         self.waiting = 0
         self.arrived = 0
         self.direction = [2] * self.elevator_num
@@ -582,12 +579,12 @@ class ElevatorEnv(gym.Env):
 
     @property
     def avg_waiting_time(self):
-        return self.total_waiting_time/(self.travelled + 0.000000000001)
+        return self.get_total_waiting_time()/(self.waited + 0.000000000001)
         # return self.total_waiting_time/sum(self.poisson[:self.step_index])
 
     @property
-    def avg_travelling_time(self):
-        return self.total_elevator_time/(self.arrived + 0.000000000001)
+    def avg_traveling_time(self):
+        return self.get_total_traveling_time()/(self.traveled + 0.000000000001)
 
     def get_reward(self, unload_count, load_count, reward_func=1, unload_reward=None, load_reward=None, discount=None):
         reward = 0
@@ -626,7 +623,7 @@ class ElevatorEnv(gym.Env):
                 for i in self.reward_3[1]:
                     reward += unload_reward * (discount ** i)
             if self.punish:
-                reward = -100
+                reward = -1
             # if reward != -100: print("A")
             # reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
 

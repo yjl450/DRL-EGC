@@ -130,11 +130,11 @@ if __name__ == '__main__':
     env = make("gym_elevator:Elevator-v0")#make_env(step)
     env.reset()
     controller('dumb_rotater', env, step, render=False)
-    print(env.waited, env.travelled, env.arrived, env.avg_waiting_time, env.avg_travelling_time)
+    print(env.waited, env.traveled, env.arrived, env.avg_waiting_time, env.avg_traveling_time)
 
 
     # env = make("gym_elevator:Elevator-v0")#make_env(step)
     # env.reset()
     # controller('nearest_car', env, step, render=False)
-    # print(env.waited, env.travelled, env.arrived, env.avg_waiting_time, env.avg_travelling_time)
+    # print(env.waited, env.traveled, env.arrived, env.avg_waiting_time, env.avg_traveling_time)
     # env.render_close()
