@@ -1,6 +1,7 @@
 import gym
 import argparse
 import os
+import sys
 
 # Prevent numpy from using multiple threads
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -18,9 +19,9 @@ EPISODE = 1000
 
 
 def main():
-
+    import logging
     parser = argparse.ArgumentParser()
-    parser.add_argument("--processes", type=int, default=1)
+    parser.add_argument("--processes", type=int, default=16)
     parser.add_argument("--env", type=str, default="gym_elevator:Elevator-v0")
     parser.add_argument("--seed", type=int, default=0,
                         help="Random seed [0, 2 ** 31)")
@@ -36,11 +37,13 @@ def main():
     parser.add_argument("--t-max", type=int, default=5)
     parser.add_argument("--beta", type=float, default=1e-2)
     parser.add_argument("--profile", action="store_true")
-    parser.add_argument("--steps", type=int, default=1e8*EPISODE)
+    parser.add_argument("--setting", type=str, default=None)
+    parser.add_argument("--steps", type=int, default=10**9)
     parser.add_argument("--max-episode-steps", type=int, default=1000)
+    parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--eval-interval", type=int, default=25000)
-    parser.add_argument("--eval-n-runs", type=int, default=100)
+    parser.add_argument("--eval-interval", type=int, default=10**4)
+    parser.add_argument("--eval-n-runs", type=int, default=20)
     parser.add_argument("--demo", action="store_true", default=False)
     parser.add_argument("--load-pretrained",
                         action="store_true", default=False)
@@ -48,10 +51,7 @@ def main():
         "--pretrained-type", type=str, default="best", choices=["best", "final"]
     )
     parser.add_argument("--load", type=str, default="")
-    parser.add_argument("--reward", type=int, default=1)
-    parser.add_argument(
-        "--num-demo-envs", type=int, default=1, help="Number of demo envs run in parallel."
-    )
+    parser.add_argument("--reward", type=int, default=3)
     parser.add_argument(
         "--log-level",
         type=int,
@@ -73,15 +73,8 @@ def main():
         ),
     )
     args = parser.parse_args()
-
-    import logging
-
-    logging.basicConfig(level=args.log_level)
-
-    # Set a random seed used in PFRL.
-    # If you use more than one processes, the results will be no longer
-    # deterministic even with the same random seed.
-    utils.set_random_seed(args.seed)
+    if args.setting:
+        args.outdir = args.outdir+"/"+str(args.setting)
 
     # Set different random seeds for different subprocesses.
     # If seed=0 and processes=4, subprocess seeds are [0, 1, 2, 3].
@@ -89,17 +82,15 @@ def main():
     process_seeds = np.arange(args.processes) + args.seed * args.processes
     assert process_seeds.max() < 2 ** 31
 
-    args.outdir = experiments.prepare_output_dir(args, args.outdir)
-    print("Output files are saved in {}".format(args.outdir))
 
     def make_env(process_idx, test):
         # Use different random seeds for train and test envs
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
-        env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=3,
-                       floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
-                       seed=env_seed, reward_func=args.reward, unload_reward=100, 
-                       load_reward=100, discount=None)
+        env = gym.make(args.env, elevator_num=4, elevator_limit=10, floor_num=10,
+                       floor_limit=40, step_size=1000, poisson_lambda=3, 
+                       seed=env_seed, reward_func=3, unload_reward=100, 
+                       load_reward=100, discount=0.99)
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
             env = pfrl.wrappers.Monitor(
@@ -113,13 +104,30 @@ def main():
     obs_size = sample_env.observation_space.shape[0]
     n_actions = sample_env.action_space.n
 
+    # Set a random seed used in PFRL.
+    # If you use more than one processes, the results will be no longer
+    # deterministic even with the same random seed.
+    utils.set_random_seed(args.seed)
+    args.__dict__["envarg"] = str(sample_env.args)
+
+    if args.setting:
+        args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+        print("Output files are saved in {}".format(args.outdir))
+        log_file = args.outdir + "/train_eval.log"
+        logging.basicConfig(filename=log_file, filemode='a',level=logging.INFO)
+    else:
+        args.outdir += "/test"
+        args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+        print("Output files are saved in {}".format(args.outdir))
+        logging.basicConfig(level=logging.INFO)
+
+    logger = logging.getLogger(__name__)
+
     model = nn.Sequential(
-        nn.Linear(obs_size, 64),
-        nn.Tanh(),
-        nn.Linear(64, 512),
-        nn.Tanh(),
+        nn.Linear(obs_size, 512),
+        nn.ReLU(),
         nn.Linear(512, 2592),
-        nn.Tanh(),
+        nn.ReLU(),
         nn.Linear(2592, 256),
         nn.ReLU(),
         pfrl.nn.Branched(
@@ -130,14 +138,6 @@ def main():
             nn.Linear(256, 1),
         ),
     )
-    # print(model)
-    # sample_env = make_env(0, False)
-    # sample_env.reset()
-    # a,v,c,d = sample_env.step(0)
-    # result = model(torch.from_numpy(a))
-    # print(result[0]._param)
-    # print(result[1])
-    # return
 
     # SharedRMSprop is same as torch.optim.RMSprop except that it initializes
     # its state in __init__, allowing it to be moved to shared memory.
@@ -156,7 +156,7 @@ def main():
         model,
         opt,
         t_max=args.t_max,
-        gamma=1,
+        gamma=args.gamma,
         beta=args.beta,
         phi=phi,
         max_grad_norm=40.0,
@@ -181,6 +181,7 @@ def main():
             n_steps=None,
             n_episodes=args.eval_n_runs,
             max_episode_len=args.steps,
+            logger=logger
         )
         print(
             "n_steps: {} mean: {} median: {} stdev: {}".format(
@@ -214,6 +215,7 @@ def main():
             eval_interval=args.eval_interval,
             global_step_hooks=[lr_decay_hook],
             save_best_so_far_agent=True,
+            logger=logger
         )
 
 

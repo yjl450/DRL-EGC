@@ -19,8 +19,6 @@ from utils import DistributionalDuelingHead
 
 def main():
     import logging
-
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--outdir",
@@ -117,7 +115,6 @@ def main():
 
     # Set a random seed used in PFRL
     utils.set_random_seed(args.seed)
-    print(args)
     args.__dict__["envarg"] = str(env.args)
     args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
     print("Output files are saved in {}".format(args.outdir))
