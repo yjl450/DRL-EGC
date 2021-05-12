@@ -400,8 +400,8 @@ class ElevatorEnv(gym.Env):
             unload_count, load_count, self.reward_func, self.unload_reward, self.load_reward, self.discount)
 
         done = self.step_index >= (self.step_size)
-        if done:
-            print("ATT:",self.avg_traveling_time, "AWT:", self.avg_waiting_time)
+        # if done:
+        #     print("ATT:",self.avg_traveling_time, "AWT:", self.avg_waiting_time)
 
         # Infinite episode so no ending singal
 
