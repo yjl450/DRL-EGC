@@ -85,18 +85,6 @@ def main():
     args = parser.parse_args()
     print(args)
 
-
-    # Set a random seed used in PFRL
-    utils.set_random_seed(args.seed)
-
-    args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
-    print("Output files are saved in {}".format(args.outdir))
-
-    logging.basicConfig(filename=args.outdir + "/train_eval.log",
-                            filemode='a',level=logging.INFO)
-
-    logger = logging.getLogger(__name__)
-
     # Set different random seeds for different subprocesses.
     # If seed=0 and processes=4, subprocess seeds are [0, 1, 2, 3].
     # If seed=1 and processes=4, subprocess seeds are [4, 5, 6, 7].
@@ -107,10 +95,13 @@ def main():
         return np.clip(a, action_space.low, action_space.high)
 
     def make_env(idx=0, test=False):
-        env = gym.make(args.env)
         # Use different random seeds for train and test envs
         process_seed = int(process_seeds[idx])
         env_seed = 2 ** 32 - 1 - process_seed if test else process_seed
+        env = gym.make(args.env, elevator_num=1, elevator_limit=10, floor_num=2,
+                floor_limit=40, step_size=1000, poisson_lambda=1, 
+                seed=env_seed, reward_func=3, unload_reward=100,
+                load_reward=100, discount=0.99)
         utils.set_random_seed(env_seed)
         # Cast observations to float32 because our model uses float32
         env = pfrl.wrappers.CastObservationToFloat32(env)
@@ -127,11 +118,24 @@ def main():
         return env
 
     env = make_env(test=False)
-    timestep_limit = env.spec.max_episode_steps - 1
+    timestep_limit = env.spec.max_episode_steps
     obs_space = env.observation_space
     # obs_size = obs_space.low.size
     obs_size = obs_space.shape[0] #.low.size
     action_space = env.action_space
+
+    # Set a random seed used in PFRL
+    utils.set_random_seed(args.seed)
+    print(args)
+    args.__dict__["envarg"] = str(env.args)
+    args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+    print("Output files are saved in {}".format(args.outdir))
+    log_file = args.outdir + "/train_eval.log"
+
+    logging.basicConfig(filename=log_file,
+                            filemode='a',level=logging.INFO)
+
+    logger = logging.getLogger(__name__)
 
     n_actions = action_space.n
     q_func = q_functions.FCStateQFunctionWithDiscreteAction(
