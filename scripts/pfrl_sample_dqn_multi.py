@@ -1,22 +1,11 @@
-"""An example of training DQN against OpenAI Gym Envs.
-
-This script is an example of training a DQN agent against OpenAI Gym envs.
-Both discrete and continuous action spaces are supported. For continuous action
-spaces, A NAF (Normalized Advantage Function) is used to approximate Q-values.
-
-To solve CartPole-v0, run:
-    python train_dqn_gym.py --env CartPole-v0
-
-To solve Pendulum-v0, run:
-    python train_dqn_gym.py --env Pendulum-v0
-"""
-
+# PRFL Rainbow Implementation
 import argparse
 import os
 import sys
 
 import gym
 import numpy as np
+from torch import nn
 import torch.optim as optim
 from gym import spaces
 
@@ -24,7 +13,8 @@ import pfrl
 from pfrl import experiments, explorers
 from pfrl import nn as pnn
 from pfrl import q_functions, replay_buffers, utils
-from pfrl.agents.double_dqn import DoubleDQN
+from pfrl.agents import DoubleDQN, CategoricalDoubleDQN
+from utils import DistributionalDuelingHead
 
 
 def main():
@@ -47,17 +37,17 @@ def main():
     parser.add_argument("--final-exploration-steps", type=int, default=10 ** 7)
     parser.add_argument("--start-epsilon", type=float, default=1.0)
     parser.add_argument("--end-epsilon", type=float, default=0.1)
-    parser.add_argument("--noisy-net-sigma", type=float, default=None)
+    parser.add_argument("--noisy-net-sigma", type=float, default=0.5)
     parser.add_argument("--demo", action="store_true", default=False)
     parser.add_argument("--load", type=str, default=None)
     parser.add_argument("--setting", type=str, default=None)
-    parser.add_argument("--steps", type=int, default=10 ** 10)
-    parser.add_argument("--prioritized-replay", action="store_true")
+    parser.add_argument("--steps", type=int, default=10**9)
+    parser.add_argument("--no-prioritized-replay", action="store_true")
     parser.add_argument("--replay-start-size", type=int, default=100000)
-    parser.add_argument("--target-update-interval", type=int, default=1000)
-    parser.add_argument("--target-update-method", type=str, default="soft")
+    parser.add_argument("--target-update-interval", type=int, default=5000)
+    parser.add_argument("--target-update-method", type=str, default="hard")
     parser.add_argument("--soft-update-tau", type=float, default=1e-2)
-    parser.add_argument("--update-interval", type=int, default=1000)
+    parser.add_argument("--update-interval", type=int, default=1)
     parser.add_argument("--eval-n-runs", type=int, default=20)
     parser.add_argument("--eval-interval", type=int, default=10 ** 4)
     parser.add_argument("--n-hidden-channels", type=int, default=20)
@@ -83,7 +73,8 @@ def main():
         ),
     )  # NOQA
     args = parser.parse_args()
-    print(args)
+    if args.setting:
+        args.outdir = args.outdir+"/"+str(args.setting)
 
     # Set different random seeds for different subprocesses.
     # If seed=0 and processes=4, subprocess seeds are [0, 1, 2, 3].
@@ -132,45 +123,53 @@ def main():
     print("Output files are saved in {}".format(args.outdir))
     log_file = args.outdir + "/train_eval.log"
 
-    logging.basicConfig(filename=log_file,
-                            filemode='a',level=logging.INFO)
-
+    logging.basicConfig(filename=log_file, filemode='a',level=logging.INFO)
     logger = logging.getLogger(__name__)
 
     n_actions = action_space.n
-    q_func = q_functions.FCStateQFunctionWithDiscreteAction(
-        obs_size,
-        n_actions,
-        n_hidden_channels=args.n_hidden_channels,
-        n_hidden_layers=args.n_hidden_layers,
+    n_atoms = 51
+    v_max = 1000000
+    v_min = -1 * 1000 -1
+    q_func = nn.Sequential(
+        nn.Linear(obs_size, 512),
+        nn.ReLU(),
+        nn.Linear(512, 512),
+        nn.ReLU(),
+        DistributionalDuelingHead(512, n_actions, n_atoms, v_min, v_max),
     )
-    # Use epsilon-greedy for exploration
-    explorer = explorers.LinearDecayEpsilonGreedy(
-        args.start_epsilon,
-        args.end_epsilon,
-        args.final_exploration_steps,
-        action_space.sample,
-    )
+
 
     if args.noisy_net_sigma is not None:
         pnn.to_factorized_noisy(q_func, sigma_scale=args.noisy_net_sigma)
         # Turn off explorer
         explorer = explorers.Greedy()
+    else:
+        # Use epsilon-greedy for exploration
+        explorer = explorers.LinearDecayEpsilonGreedy(
+            args.start_epsilon,
+            args.end_epsilon,
+            args.final_exploration_steps,
+            action_space.sample,
+        )
 
     opt = optim.Adam(q_func.parameters())
 
-    rbuf_capacity = 5 * 10 ** 5
+    rbuf_capacity = 10**6
     if args.minibatch_size is None:
-        args.minibatch_size = 32
-    if args.prioritized_replay:
+        args.minibatch_size = 128
+    if not args.no_prioritized_replay:
         betasteps = (args.steps - args.replay_start_size) // args.update_interval
         rbuf = replay_buffers.PrioritizedReplayBuffer(
-            rbuf_capacity, betasteps=betasteps
+            rbuf_capacity, 
+            betasteps=betasteps,
+            
+            num_steps=3,
+            normalize_by_max="memory",
         )
     else:
         rbuf = replay_buffers.ReplayBuffer(rbuf_capacity)
 
-    agent = DoubleDQN(
+    agent = CategoricalDoubleDQN(
         q_func,
         opt,
         rbuf,
@@ -183,6 +182,7 @@ def main():
         minibatch_size=args.minibatch_size,
         target_update_method=args.target_update_method,
         soft_update_tau=args.soft_update_tau,
+        batch_accumulator="mean",
     )
 
     if args.load:

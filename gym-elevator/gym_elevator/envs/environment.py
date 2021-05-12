@@ -629,7 +629,7 @@ class ElevatorEnv(gym.Env):
                 for i in self.reward_3[1]:
                     reward += unload_reward * (discount ** i)
             if self.punish:
-                reward = -1
+                reward = -10
             # if reward != -100: print("A")
             # reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
 

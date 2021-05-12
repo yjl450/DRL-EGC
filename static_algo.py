@@ -127,7 +127,10 @@ def controller(algo, env, step, render=True):
 if __name__ == '__main__':
     step = 1000
 
-    env = make("gym_elevator:Elevator-v0")#make_env(step)
+    env = make("gym_elevator:Elevator-v0", elevator_num=4, elevator_limit=10, floor_num=10,
+                       floor_limit=40, step_size=1000, poisson_lambda=3, 
+                       seed=0, reward_func=3, unload_reward=100, 
+                       load_reward=100, discount=0.99)
     env.reset()
     controller('dumb_rotater', env, step, render=False)
     print(env.waited, env.traveled, env.arrived, env.avg_waiting_time, env.avg_traveling_time)
