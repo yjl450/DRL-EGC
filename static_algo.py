@@ -4,7 +4,9 @@ from gym import make
 
 
 def dumb_rotater(env, step, render=True):
-    env.step(env.encodeAction([2] * env.elevator_num))
+    total_reward = 0
+    _,r,_,_ =env.step(env.encodeAction([2] * env.elevator_num))
+    total_reward += r
     if render:
         env.render()
     action = [2] * env.elevator_num
@@ -17,11 +19,12 @@ def dumb_rotater(env, step, render=True):
             elif env.state[j] == 1:
                 action[j] = 1
         _,r,_,_ = env.step(env.encodeAction(action))
-        print(r)
+        total_reward += r
         if render:
             env.render()
         _,r,_,_ = env.step(env.encodeAction([2] * env.elevator_num))
-        print(r)
+        total_reward += r
+        # print(r)
         if render:
             env.render()
     while env.step_index < step:
@@ -33,13 +36,18 @@ def dumb_rotater(env, step, render=True):
             elif env.state[j] == 1:
                 action[j] = 1
         _,r,_,_ = env.step(env.encodeAction(action))
-        print(r)
+        total_reward += r
+        # print(r)
         if render:
             env.render()
         _,r,_,_ = env.step(env.encodeAction([2] * env.elevator_num))
-        print(r)
+        total_reward += r
+        # print(r)
         if render:
             env.render()
+    if render:
+        env.close()
+    print(total_reward)
 
 
 def nearest_car(env, step, render=True):
@@ -121,9 +129,8 @@ if __name__ == '__main__':
 
     env = make("gym_elevator:Elevator-v0")#make_env(step)
     env.reset()
-    controller('dumb_rotater', env, step, render=True)
+    controller('dumb_rotater', env, step, render=False)
     print(env.waited, env.travelled, env.arrived, env.avg_waiting_time, env.avg_travelling_time)
-    env.render_close()
 
 
     # env = make("gym_elevator:Elevator-v0")#make_env(step)
