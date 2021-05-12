@@ -1,29 +1,32 @@
-import gym
 import argparse
 import os
 
 # Prevent numpy from using multiple threads
 os.environ["OMP_NUM_THREADS"] = "1"
 
+import gym  # NOQA:E402
+import gym.wrappers  # NOQA:E402
 import numpy as np  # NOQA:E402
 from torch import nn  # NOQA:E402
+import torch
 
 import pfrl  # NOQA:E402
 from pfrl import experiments, utils  # NOQA:E402
-from pfrl.agents.acer import ACER # NOQA:E402
+from pfrl.agents import acer  # NOQA:E402
 from pfrl.optimizers import SharedRMSpropEpsInsideSqrt  # NOQA:E402
 from pfrl.policies import SoftmaxCategoricalHead  # NOQA:E402
-
+from pfrl.q_functions import DiscreteActionValueHead  # NOQA:E402
+from pfrl import replay_buffers  # NOQA:E402
 EPISODE = 1000
 
 
 def main():
+    torch.set_default_tensor_type(torch.FloatTensor)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--processes", type=int, default=16)
+    parser.add_argument("--processes", type=int, default=1)
     parser.add_argument("--env", type=str, default="gym_elevator:Elevator-v0")
-    parser.add_argument("--seed", type=int, default=0,
-                        help="Random seed [0, 2 ** 31)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed [0, 2 ** 31)")
     parser.add_argument(
         "--outdir",
         type=str,
@@ -34,13 +37,22 @@ def main():
         ),
     )
     parser.add_argument("--t-max", type=int, default=5)
+    parser.add_argument("--replay-start-size", type=int, default=10000)
+    parser.add_argument("--n-times-replay", type=int, default=4)
     parser.add_argument("--beta", type=float, default=1e-2)
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--steps", type=int, default=1e8*EPISODE)
     parser.add_argument("--max-episode-steps", type=int, default=1000)
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=30 * 60 * 60,  # 30 minutes with 60 fps
+        help="Maximum number of frames for each episode.",
+    )
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--eval-interval", type=int, default=25000)
-    parser.add_argument("--eval-n-runs", type=int, default=100)
+    parser.add_argument("--eval-n-runs", type=int, default=10)
+    parser.add_argument("--use-lstm", default=False, action="store_true")
     parser.add_argument("--demo", action="store_true", default=False)
     parser.add_argument("--load-pretrained",
                         action="store_true", default=False)
@@ -50,12 +62,9 @@ def main():
     parser.add_argument("--load", type=str, default="")
     parser.add_argument("--reward", type=int, default=1)
     parser.add_argument(
-        "--num-demo-envs", type=int, default=1, help="Number of demo envs run in parallel."
-    )
-    parser.add_argument(
         "--log-level",
         type=int,
-        default=10,
+        default=20,
         help="Logging level. 10:DEBUG, 20:INFO etc.",
     )
     parser.add_argument(
@@ -99,7 +108,7 @@ def main():
         env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=3,
                        floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
                        seed=env_seed, reward_func=args.reward, unload_reward=100, 
-                       load_reward=100, discount=None) 
+                       load_reward=100, discount=None)
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
             env = pfrl.wrappers.Monitor(
@@ -113,71 +122,67 @@ def main():
     obs_size = sample_env.observation_space.shape[0]
     n_actions = sample_env.action_space.n
 
-    model = nn.Sequential(
+
+    input_to_hidden = nn.Sequential(
         nn.Linear(obs_size, 64),
-        nn.Tanh(),
+        nn.ReLU(),
         nn.Linear(64, 512),
-        nn.Tanh(),
+        nn.ReLU(),
         nn.Linear(512, 2592),
-        nn.Tanh(),
-        # nn.Conv2d(obs_size, 16, 8, stride=4),
-        # nn.ReLU(),
-        # nn.Conv2d(16, 32, 4, stride=2),
-        # nn.ReLU(),
-        # nn.Flatten(),
+        nn.ReLU(),
         nn.Linear(2592, 256),
         nn.ReLU(),
-        pfrl.nn.Branched(
-            nn.Sequential(
-                nn.Linear(256, n_actions),
-                SoftmaxCategoricalHead(),
-            ),
-            nn.Linear(256, 1),
+    )
+
+    head = acer.ACERDiscreteActionHead(
+        pi=nn.Sequential(
+            nn.Linear(256, n_actions),
+            SoftmaxCategoricalHead(),
+        ),
+        q=nn.Sequential(
+            nn.Linear(256, n_actions),
+            DiscreteActionValueHead(),
         ),
     )
-    # print(model)
-    # sample_env = make_env(0, False)
-    # sample_env.reset()
-    # a,v,c,d = sample_env.step(0)
-    # result = model(torch.from_numpy(a))
-    # print(result[0]._param)
-    # print(result[1])
-    # return
+
+    if args.use_lstm:
+        model = pfrl.nn.RecurrentSequential(
+            input_to_hidden,
+            nn.LSTM(num_layers=1, input_size=256, hidden_size=256),
+            head,
+        )
+    else:
+        model = nn.Sequential(input_to_hidden, head)
+
+    model.apply(pfrl.initializers.init_chainer_default)
 
     # SharedRMSprop is same as torch.optim.RMSprop except that it initializes
     # its state in __init__, allowing it to be moved to shared memory.
     opt = SharedRMSpropEpsInsideSqrt(
-        model.parameters(), lr=7e-4, eps=1e-1, alpha=0.99)
-    assert opt.state_dict()["state"], (
-        "To share optimizer state across processes, the state must be"
-        " initialized before training."
+        model.parameters(), lr=args.lr, eps=1e-1, alpha=0.99
     )
 
+    replay_buffer = replay_buffers.ReplayBuffer(10 ** 6 // args.processes)
     def phi(x):
         # Feature extractor
         return np.asarray(x, dtype=np.float32) / 255
-
-    agent = ACER(
+    rbuf = replay_buffers.ReplayBuffer(10 ** 6 // args.processes)
+    agent = acer.ACER(
         model,
         opt,
-        t_max=args.t_max,
+        t_max=args.t_max, #batch
         gamma=1,
+        replay_buffer=rbuf,
+        n_times_replay=args.n_times_replay,
+        replay_start_size=args.replay_start_size,
         beta=args.beta,
         phi=phi,
-        max_grad_norm=40.0,
+        max_grad_norm=40,
+        recurrent=args.use_lstm,
     )
 
-    if args.load or args.load_pretrained:
-        # either load or load_pretrained must be false
-        assert not args.load or not args.load_pretrained
-        if args.load:
-            agent.load(args.load)
-        else:
-            agent.load(
-                utils.download_model("A3C", args.env, model_type=args.pretrained_type)[
-                    0
-                ]
-            )
+    if args.load:
+        agent.load(args.load)
     if args.demo:
         env = make_env(0, True)
         eval_stats = experiments.eval_performance(

@@ -20,7 +20,7 @@ EPISODE = 1000
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--processes", type=int, default=16)
+    parser.add_argument("--processes", type=int, default=1)
     parser.add_argument("--env", type=str, default="gym_elevator:Elevator-v0")
     parser.add_argument("--seed", type=int, default=0,
                         help="Random seed [0, 2 ** 31)")
@@ -55,7 +55,7 @@ def main():
     parser.add_argument(
         "--log-level",
         type=int,
-        default=10,
+        default=20,
         help="Logging level. 10:DEBUG, 20:INFO etc.",
     )
     parser.add_argument(
@@ -96,11 +96,10 @@ def main():
         # Use different random seeds for train and test envs
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
-        env = gym.make(args.env)
-        #, elevator_num=2, elevator_limit=10, floor_num=3,
-                    #    floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
-                    #    seed=env_seed, reward_func=args.reward, unload_reward=100, 
-                    #    load_reward=100, discount=None)
+        env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=3,
+                       floor_limit=10, step_size=args.max_episode_steps, poisson_lambda=1, 
+                       seed=env_seed, reward_func=args.reward, unload_reward=100, 
+                       load_reward=100, discount=None)
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
             env = pfrl.wrappers.Monitor(
@@ -121,11 +120,6 @@ def main():
         nn.Tanh(),
         nn.Linear(512, 2592),
         nn.Tanh(),
-        # nn.Conv2d(obs_size, 16, 8, stride=4),
-        # nn.ReLU(),
-        # nn.Conv2d(16, 32, 4, stride=2),
-        # nn.ReLU(),
-        # nn.Flatten(),
         nn.Linear(2592, 256),
         nn.ReLU(),
         pfrl.nn.Branched(
