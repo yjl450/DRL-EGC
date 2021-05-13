@@ -40,7 +40,7 @@ def main():
     parser.add_argument("--setting", type=str, default=None)
     parser.add_argument("--steps", type=int, default=10**9)
     parser.add_argument("--max-episode-steps", type=int, default=1000)
-    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gamma", type=float, default=1)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--eval-interval", type=int, default=10**4)
     parser.add_argument("--eval-n-runs", type=int, default=20)
@@ -87,10 +87,10 @@ def main():
         # Use different random seeds for train and test envs
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
-        env = gym.make(args.env, elevator_num=4, elevator_limit=10, floor_num=10,
+        env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=5,
                        floor_limit=40, step_size=1000, poisson_lambda=3, 
-                       seed=env_seed, reward_func=3, unload_reward=100, 
-                       load_reward=100, discount=0.99)
+                       seed=env_seed, reward_func=args.reward, unload_reward=10000, 
+                       load_reward=1000, discount=0.99, punish=-100)
         env = pfrl.wrappers.CastObservationToFloat32(env)
         if args.monitor:
             env = pfrl.wrappers.Monitor(

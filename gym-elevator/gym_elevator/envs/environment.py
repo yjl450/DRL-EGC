@@ -29,7 +29,7 @@ class ElevatorEnv(gym.Env):
     """
 
     def __init__(self, elevator_num=10, elevator_limit=13, floor_num=15, floor_limit=40,
-                 poisson_lambda=1, step_size=1000, seed=0, reward_func=2, unload_reward=None, load_reward=None, discount=None, capacity=0):
+                 poisson_lambda=1, step_size=1000, seed=0, reward_func=2, unload_reward=None, load_reward=None, discount=None,punish=-100, capacity=0):
         """
         Initializa a EGC system
 
@@ -51,7 +51,7 @@ class ElevatorEnv(gym.Env):
         self.args = {
             "elevator_num": elevator_num, "elevator_limit": elevator_limit, "floor_num": floor_num, "floor_limit": floor_limit,
             "poisson_lambda": poisson_lambda, "step_size": step_size, "seed": seed, "reward_func": reward_func, 
-            "unload_reward": unload_reward, "load_reward": load_reward, "discount": discount
+            "unload_reward": unload_reward, "load_reward": load_reward, "discount": discount, "punish": punish
         }
         self.elevator_num = elevator_num
         self.elevator_limit = elevator_limit
@@ -64,6 +64,7 @@ class ElevatorEnv(gym.Env):
         self.lam = poisson_lambda
         self.step_size = step_size
         self.poisson = None
+        self.punish_reward = punish
 
         self.total_waiting_time = 0  # sum of every passenger's waiting time
         self.total_square_waiting_time = 0
@@ -629,7 +630,7 @@ class ElevatorEnv(gym.Env):
                 for i in self.reward_3[1]:
                     reward += unload_reward * (discount ** i)
             if self.punish:
-                reward = -10
+                reward = self.punish_reward
             # if reward != -100: print("A")
             # reward -= sum(self.waiting_time_table) + sum(self.traveling_time_table)
 

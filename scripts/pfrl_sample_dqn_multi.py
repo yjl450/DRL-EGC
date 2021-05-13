@@ -89,8 +89,8 @@ def main():
         env_seed = 2 ** 32 - 1 - process_seed if test else process_seed
         env = gym.make(args.env, elevator_num=4, elevator_limit=10, floor_num=10,
                        floor_limit=40, step_size=1000, poisson_lambda=3, 
-                       seed=env_seed, reward_func=3, unload_reward=100, 
-                       load_reward=100, discount=0.99)
+                       seed=env_seed, reward_func=3, unload_reward=10000, 
+                       load_reward=1000, discount=0.99, punish=-100)
         utils.set_random_seed(env_seed)
         # Cast observations to float32 because our model uses float32
         env = pfrl.wrappers.CastObservationToFloat32(env)
