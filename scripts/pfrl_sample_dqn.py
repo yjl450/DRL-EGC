@@ -119,11 +119,21 @@ def main():
     utils.set_random_seed(args.seed)
     print(args)
     args.__dict__["envarg"] = str(env.args)
-    args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
-    print("Output files are saved in {}".format(args.outdir))
-    log_file = args.outdir + "/train_eval.log"
+    # args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+    # print("Output files are saved in {}".format(args.outdir))
+    # log_file = args.outdir + "/train_eval.log"
 
-    logging.basicConfig(filename=log_file, filemode='a',level=logging.INFO)
+    # logging.basicConfig(filename=log_file, filemode='a',level=logging.INFO)
+    if args.setting:
+        args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+        print("Output files are saved in {}".format(args.outdir))
+        log_file = args.outdir + "/train_eval.log"
+        logging.basicConfig(filename=log_file, filemode='a',level=logging.INFO)
+    else:
+        args.outdir += "/test"
+        args.outdir = experiments.prepare_output_dir(args, args.outdir, argv=sys.argv)
+        print("Output files are saved in {}".format(args.outdir))
+        logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
     n_actions = action_space.n
