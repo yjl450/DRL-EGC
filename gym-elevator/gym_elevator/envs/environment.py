@@ -481,7 +481,8 @@ class ElevatorEnv(gym.Env):
     def get_total_waiting_time(self):
         total = 0
         for time in self.waiting_time_table:
-            total += self.step_index - time
+            if time >0:
+                total += self.step_index - time
 
         total += self.total_waiting_time
         return total
@@ -489,7 +490,8 @@ class ElevatorEnv(gym.Env):
     def get_total_squared_waiting_time(self):
         total = 0
         for time in self.waiting_time_table:
-            total += (self.step_index - time)**2
+            if time > 0:
+                total += (self.step_index - time)**2
 
         total += self.total_square_waiting_time
         return total
@@ -497,7 +499,8 @@ class ElevatorEnv(gym.Env):
     def get_total_traveling_time(self):
         total = 0
         for time in self.traveling_time_table:
-            total += self.step_index - time
+            if time > 0:
+                total += self.step_index - time
 
         total += self.total_elevator_time
         return total
@@ -505,7 +508,8 @@ class ElevatorEnv(gym.Env):
     def get_total_square_traveling_time(self):
         total = 0
         for time in self.traveling_time_table:
-            total += (self.step_index - time)**2
+            if time > 0:
+                total += (self.step_index - time)**2
 
         total += self.total_square_elevator_time
         return total
