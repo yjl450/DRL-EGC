@@ -88,7 +88,7 @@ def main():
         process_seed = int(process_seeds[process_idx])
         env_seed = 2 ** 31 - 1 - process_seed if test else process_seed
         env = gym.make(args.env, elevator_num=2, elevator_limit=10, floor_num=5,
-                       floor_limit=40, step_size=1000, poisson_lambda=3, 
+                       floor_limit=40, step_size=1000, poisson_lambda=1, 
                        seed=env_seed, reward_func=args.reward, unload_reward=10000, 
                        load_reward=1000, discount=0.99, punish=-100)
         env = pfrl.wrappers.CastObservationToFloat32(env)
@@ -184,12 +184,13 @@ def main():
             logger=logger
         )
         print(
-            "n_steps: {} mean: {} median: {} stdev: {}".format(
-                args.eval_n_runs,
-                eval_stats["mean"],
-                eval_stats["median"],
-                eval_stats["stdev"],
-            )
+            # "n_steps: {} mean: {} median: {} stdev: {}".format(
+            #     args.eval_n_runs,
+            #     eval_stats["mean"],
+            #     eval_stats["median"],
+            #     eval_stats["stdev"],
+            # )
+            eval_stats
         )
     else:
 
