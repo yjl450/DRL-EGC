@@ -541,7 +541,7 @@ class ElevatorEnv(gym.Env):
             lam=self.lam, size=self.step_size+1)
         self.step_index = 0
         self.traveled = 0
-        self.waiting = 0
+        self.waited = 0
         self.arrived = 0
         self.direction = [2] * self.elevator_num
         self.new_hall_call = np.zeros((self.floor_num, 2))
