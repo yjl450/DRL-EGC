@@ -210,12 +210,13 @@ def main():
             logger=logger
         )
         print(
-            "n_runs: {} mean: {} median: {} stdev {}".format(
-                args.eval_n_runs,
-                eval_stats["mean"],
-                eval_stats["median"],
-                eval_stats["stdev"],
-            )
+            # "n_runs: {} mean: {} median: {} stdev {}".format(
+            #     args.eval_n_runs,
+            #     eval_stats["mean"],
+            #     eval_stats["median"],
+            #     eval_stats["stdev"],
+            # )
+            eval_stats
         )
 
     elif not args.actor_learner:
